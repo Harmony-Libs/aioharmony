@@ -1,6 +1,6 @@
 # See https://pre-commit.com for more information
 # See https://pre-commit.com/hooks.html for more hooks
-exclude: "CHANGELOG.md|.copier-answers.yml|.all-contributorsrc"
+exclude: "CHANGELOG.md|.copier-answers.yml|.all-contributorsrc|project"
 default_stages: [pre-commit]
 
 ci:
@@ -8,6 +8,11 @@ ci:
   autoupdate_commit_msg: "chore(pre-commit.ci): pre-commit autoupdate"
 
 repos:
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v4.1.0
+    hooks:
+      - id: commitizen
+        stages: [commit-msg]
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
@@ -15,29 +20,38 @@ repos:
       - id: check-builtin-literals
       - id: check-case-conflict
       - id: check-docstring-first
+      - id: check-json
       - id: check-toml
       - id: check-xml
+      - id: check-yaml
       - id: detect-private-key
       - id: end-of-file-fixer
       - id: trailing-whitespace
+  - repo: https://github.com/tox-dev/pyproject-fmt
+    rev: "v2.5.0"
+    hooks:
+      - id: pyproject-fmt
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    rev: 0.5.18
+    hooks:
+      - id: uv-lock
   - repo: https://github.com/pre-commit/mirrors-prettier
-    rev: v4.0.0-alpha.8
+    rev: v3.1.0
     hooks:
       - id: prettier
         args: ["--tab-width", "2"]
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.9.2
+    rev: v0.9.1
     hooks:
       - id: ruff
         args: [--fix, --exit-non-zero-on-fix]
       - id: ruff-format
-  - repo: https://github.com/asottile/pyupgrade
-    rev: v3.19.1
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.3.0
     hooks:
-      - id: pyupgrade
-        args: [--py39-plus]
-#  - repo: https://github.com/pre-commit/mirrors-mypy
-#    rev: v1.11.2
-#    hooks:
-#      - id: mypy
-#        additional_dependencies: []
+      - id: codespell
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.14.1
+    hooks:
+      - id: mypy
+        additional_dependencies: []

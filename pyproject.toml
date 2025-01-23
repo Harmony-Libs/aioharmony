@@ -1,0 +1,160 @@
+[build-system]
+build-backend = "setuptools.build_meta"
+requires = [ "setuptools" ]
+
+[project]
+name = "aioharmony"
+version = "0.2.10"
+description = "syncio Python library for connecting to and controlling the Logitech Harmony"
+readme = "README.md"
+license = { text = "Apache-2.0" }
+authors = [
+  { name = "Erik Hendrix", email = "endrix_erik@hotmail.com" },
+  { name = "J. Nick Koston", email = "nick@koston.org" },
+]
+requires-python = ">=3.9"
+classifiers = [
+    'Framework :: AsyncIO',
+    'Intended Audience :: Developers',
+    'License :: OSI Approved :: Apache Software License',
+    'Programming Language :: Python',
+    'Programming Language :: Python :: 3',
+    'Programming Language :: Python :: 3.9',
+    'Programming Language :: Python :: 3.10',
+    'Programming Language :: Python :: 3.11',
+    'Programming Language :: Python :: 3.12',
+    'Programming Language :: Python :: 3.13',
+    'Programming Language :: Python :: Implementation :: CPython',
+    'Programming Language :: Python :: Implementation :: PyPy',
+    'Topic :: Home Automation',
+    'Topic :: Software Development :: Libraries :: Python Modules'
+]
+
+dependencies = [
+  'aiohttp',
+  'async-timeout',
+  'slixmpp'
+]
+urls."Bug Tracker" = "https://github.com/harmony-libs/aioharmony/issues"
+urls.Changelog = "https://github.com/harmony-libs/aioharmony/blob/main/CHANGELOG.md"
+urls.repository = "https://github.com/harmony-libs/aioharmony"
+
+[dependency-groups]
+dev = [
+  "pytest>=8,<9",
+  "pytest-cov>=6,<7",
+]
+
+[tool.ruff]
+target-version = "py39"
+line-length = 88
+lint.select = [
+  "B",   # flake8-bugbear
+  "D",   # flake8-docstrings
+  "C4",  # flake8-comprehensions
+  "S",   # flake8-bandit
+  "F",   # pyflake
+  "E",   # pycodestyle
+  "W",   # pycodestyle
+  "UP",  # pyupgrade
+  "I",   # isort
+  "RUF", # ruff specific
+]
+lint.ignore = [
+  "D203", # 1 blank line required before class docstring
+  "D212", # Multi-line docstring summary should start at the first line
+  "D100", # Missing docstring in public module
+  "D104", # Missing docstring in public package
+  "D107", # Missing docstring in `__init__`
+  "D401", # First line of docstring should be in imperative mood
+]
+lint.per-file-ignores."conftest.py" = [ "D100" ]
+lint.per-file-ignores."docs/conf.py" = [ "D100" ]
+lint.per-file-ignores."setup.py" = [ "D100" ]
+lint.per-file-ignores."tests/**/*" = [
+  "D100",
+  "D101",
+  "D102",
+  "D103",
+  "D104",
+  "S101",
+]
+lint.isort.known-first-party = [ "aioharmony", "tests" ]
+
+[tool.pytest.ini_options]
+addopts = """\
+    -v
+    -Wdefault
+    --cov=aioharmony
+    --cov-report=term
+    --cov-report=xml
+    """
+pythonpath = [ "src" ]
+
+[tool.coverage.run]
+branch = true
+
+[tool.coverage.report]
+exclude_lines = [
+  "pragma: no cover",
+  "@overload",
+  "if TYPE_CHECKING",
+  "raise NotImplementedError",
+  'if __name__ == "__main__":',
+]
+
+[tool.mypy]
+check_untyped_defs = true
+disallow_any_generics = true
+disallow_incomplete_defs = true
+disallow_untyped_defs = true
+mypy_path = "src/"
+no_implicit_optional = true
+show_error_codes = true
+warn_unreachable = true
+warn_unused_ignores = true
+exclude = [
+  'setup.py',
+]
+
+[[tool.mypy.overrides]]
+module = "tests.*"
+allow_untyped_defs = true
+
+[tool.semantic_release]
+version_toml = [ "pyproject.toml:project.version" ]
+version_variables = ["src/aioharmony/__version__.py:__version__"]
+build_command = """
+pip install uv
+uv lock
+git add uv.lock
+uv build
+"""
+
+[tool.semantic_release.changelog]
+exclude_commit_patterns = [
+  '''chore(?:\([^)]*?\))?: .+''',
+  '''ci(?:\([^)]*?\))?: .+''',
+  '''refactor(?:\([^)]*?\))?: .+''',
+  '''style(?:\([^)]*?\))?: .+''',
+  '''test(?:\([^)]*?\))?: .+''',
+  '''build\((?!deps\): .+)''',
+  '''Merged? .*''',
+  '''Initial [Cc]ommit.*''', # codespell:ignore
+]
+
+[tool.semantic_release.changelog.environment]
+keep_trailing_newline = true
+
+[tool.semantic_release.branches.main]
+match = "main"
+
+[tool.semantic_release.branches.noop]
+match = "(?!main$)"
+prerelease = true
+
+[tool.uv]
+dev-dependencies = [
+    "pytest-asyncio>=0.25.2",
+    "pytest-cov>=6.0.0",
+]
