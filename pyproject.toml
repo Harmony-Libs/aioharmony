@@ -30,6 +30,9 @@ classifiers = [
     'Topic :: Software Development :: Libraries :: Python Modules'
 ]
 
+[project.scripts]
+aioharmony = "scripts.aioharmony:aioharmony"
+
 dependencies = [
   'aiohttp',
   'async-timeout',
