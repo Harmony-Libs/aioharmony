@@ -96,7 +96,7 @@ Usage
 Release Notes
 -------------
 
-See `changelog` <https://github.com/Harmony-Libs/aioharmony/CHANGELOG.md> for release notes
+See `changelog <https://github.com/Harmony-Libs/aioharmony/CHANGELOG.md>` for release notes
 
 TODO
 ----
