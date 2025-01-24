@@ -33,7 +33,7 @@ urls."Bug Tracker" = "https://github.com/harmony-libs/aioharmony/issues"
 urls.Changelog = "https://github.com/harmony-libs/aioharmony/blob/main/CHANGELOG.md"
 urls.repository = "https://github.com/harmony-libs/aioharmony"
 dependencies = [
-    "aiohttp>=3.10",
+    "aiohttp>=3.11",
     "async-timeout>=4",
     "slixmpp>=1.8",
 ]

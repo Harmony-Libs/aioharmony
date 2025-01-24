@@ -13,6 +13,7 @@ from urllib.parse import urlparse
 from uuid import uuid4
 
 import aiohttp
+from aiohttp.client_ws import ClientWSTimeout
 from async_timeout import timeout
 
 from aioharmony.const import DEFAULT_WS_HUB_PORT as DEFAULT_HUB_PORT
@@ -27,6 +28,8 @@ _LOGGER = logging.getLogger(__name__)
 
 # TODO: Add docstyle comments
 # TODO: Clean up code styling
+
+_WS_TIMEOUT = ClientWSTimeout(ws_receive=DEFAULT_TIMEOUT, ws_close=None)
 
 
 # pylint: disable=too-many-instance-attributes
@@ -115,9 +118,10 @@ class HubConnector:
         """ "Close the aiohttp session."""
         if self._aiohttp_session is None:
             return
-        with suppress(asyncio.TimeoutError), timeout(DEFAULT_TIMEOUT):
-            await self._aiohttp_session.close()
-            self._aiohttp_session = None
+        with suppress(asyncio.TimeoutError):
+            async with timeout(DEFAULT_TIMEOUT):
+                await self._aiohttp_session.close()
+                self._aiohttp_session = None
 
     async def hub_connect(self, is_reconnect: bool = False) -> bool:
         """Connect to Hub Web Socket"""
@@ -150,6 +154,7 @@ class HubConnector:
             try:
                 self._websocket = await self._session.ws_connect(
                     f"ws://{self._ip_address}:{DEFAULT_HUB_PORT}/?domain={self._domain}&hubId={self._remote_id}",
+                    timeout=_WS_TIMEOUT,  # close timeout
                     heartbeat=10,
                 )
             except (
@@ -212,8 +217,9 @@ class HubConnector:
             self._connected = False
 
             if self._websocket:
-                with suppress(asyncio.TimeoutError), timeout(DEFAULT_TIMEOUT):
-                    await self._websocket.close()
+                with suppress(asyncio.TimeoutError):
+                    async with timeout(DEFAULT_TIMEOUT):
+                        await self._websocket.close()
 
                 await self._session.close()
                 # Zero-sleep to allow underlying connections to close.
@@ -257,8 +263,9 @@ class HubConnector:
                 _LOGGER.debug(
                     "%s: Web Socket half-closed, closing first", self._ip_address
                 )
-                with suppress(asyncio.TimeoutError), timeout(DEFAULT_TIMEOUT):
-                    await self._websocket.close()
+                with suppress(asyncio.TimeoutError):
+                    async with timeout(DEFAULT_TIMEOUT):
+                        await self._websocket.close()
 
             if self._aiohttp_session is not None and not self._aiohttp_session.closed:
                 _LOGGER.debug("%s: Closing sessions", self._ip_address)

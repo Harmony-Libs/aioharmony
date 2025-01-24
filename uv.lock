@@ -41,7 +41,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "aiohttp", specifier = ">=3.10" },
+    { name = "aiohttp", specifier = ">=3.11" },
     { name = "async-timeout", specifier = ">=4" },
     { name = "slixmpp", specifier = ">=1.8" },
 ]
