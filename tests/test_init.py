@@ -1,2 +1,4 @@
+import aioharmony
+
 def test_init():
-    pass
+    assert aioharmony is not None
