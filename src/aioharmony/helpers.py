@@ -112,7 +112,7 @@ def call_raw_callback(
             return wrapped
 
         partial_func = async_partial(callback, result)
-        task = asyncio.ensure_future(partial_func())
+        task = asyncio.create_task(partial_func())
         _CALLBACK_TASKS.add(task)
         task.add_done_callback(_CALLBACK_TASKS.discard)
         return True

@@ -57,7 +57,7 @@ class ResponseHandler:
         self._name = name
         self._handler_list = []
 
-        self._callback_task = asyncio.ensure_future(self._callback_handler())
+        self._callback_task = asyncio.create_task(self._callback_handler())
 
     async def close(self):
         """

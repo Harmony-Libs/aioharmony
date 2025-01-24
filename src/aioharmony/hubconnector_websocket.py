@@ -192,7 +192,7 @@ class HubConnector:
 
             # Now put the listener on the loop.
             if not self._listener_task:
-                self._listener_task = asyncio.ensure_future(
+                self._listener_task = asyncio.create_task(
                     self._listener(self._websocket)
                 )
 
@@ -301,7 +301,7 @@ class HubConnector:
                 "Accept-Charset": "utf-8",
             }
             json_request = {"id ": msgid, "cmd": command, "params": {}}
-            response = asyncio.ensure_future(self.hub_post(url, json_request, headers))
+            response = asyncio.create_task(self.hub_post(url, json_request, headers))
             return response
 
         # Make sure we're connected.
