@@ -370,7 +370,7 @@ class HubConnector:
                     "%s: Response payload: %s", self._ip_address, response.data
                 )
 
-                if response.type == aiohttp.WSMsgType.CLOSED:
+                if response.type is aiohttp.WSMsgType.CLOSED:
                     close_code = (
                         ""
                         if response.data is None
@@ -383,11 +383,11 @@ class HubConnector:
                     have_connection = False
                     break
 
-                if response.type == aiohttp.WSMsgType.ERROR:
+                if response.type is aiohttp.WSMsgType.ERROR:
                     _LOGGER.error("%s: Response error", self._ip_address)
                     continue
 
-                if response.type != aiohttp.WSMsgType.TEXT:
+                if response.type is not aiohttp.WSMsgType.TEXT:
                     continue
 
                 response_json = response.json()
