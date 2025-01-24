@@ -4,6 +4,7 @@ This only contains some helper routines that are used.
 
 import asyncio
 import logging
+import sys
 from functools import partial
 from typing import Optional
 
@@ -112,9 +113,17 @@ def call_raw_callback(
             return wrapped
 
         partial_func = async_partial(callback, result)
-        task = asyncio.create_task(partial_func())
-        _CALLBACK_TASKS.add(task)
-        task.add_done_callback(_CALLBACK_TASKS.discard)
+        loop = asyncio.get_running_loop()
+        if sys.version_info >= (3, 12):
+            # Optimization for Python 3.12, try to write
+            # bytes immediately to avoid having to schedule
+            # the task on the event loop.
+            task = asyncio.Task(partial_func(), loop=loop, eager_start=True)
+        else:
+            task = loop.create_task(partial_func())
+        if not task.done():
+            _CALLBACK_TASKS.add(task)
+            task.add_done_callback(_CALLBACK_TASKS.discard)
         return True
 
     if callable(callback):
