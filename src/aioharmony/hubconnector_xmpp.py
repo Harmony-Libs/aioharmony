@@ -25,7 +25,7 @@ from aioharmony.helpers import call_callback
 DEFAULT_DOMAIN = "svcs.myharmony.com"
 DEFAULT_TIMEOUT = 5
 DEFAULT_USER = "user@connect.logitech.com/gatorade."
-DEFAULT_PASSWORD = "password"
+DEFAULT_PASSWORD = "password"  # noqa: S105
 DEFAULT_NS = "connect.logitech.com"
 
 _LOGGER = logging.getLogger(__name__)

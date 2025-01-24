@@ -171,7 +171,7 @@ class ResponseHandler:
         if isinstance(value, (dict, list)):
             # If they're different types then it is no match.
             # pylint: disable=unidiomatic-typecheck
-            if type(message) != type(value):
+            if type(message) != type(value):  # noqa: E721
                 return False
 
             for new_key in value:

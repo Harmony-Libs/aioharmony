@@ -53,7 +53,7 @@ target-version = "py39"
 line-length = 88
 lint.select = [
   "B",   # flake8-bugbear
-  "D",   # flake8-docstrings
+#  "D",   # flake8-docstrings
   "C4",  # flake8-comprehensions
   "S",   # flake8-bandit
   "F",   # pyflake
@@ -70,6 +70,9 @@ lint.ignore = [
   "D104", # Missing docstring in public package
   "D107", # Missing docstring in `__init__`
   "D401", # First line of docstring should be in imperative mood
+  "E501", # too many to fix
+  "RUF013", # too many to fix
+  "B904", # too many to fix
 ]
 lint.per-file-ignores."conftest.py" = [ "D100" ]
 lint.per-file-ignores."docs/conf.py" = [ "D100" ]

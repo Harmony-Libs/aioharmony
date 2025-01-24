@@ -70,7 +70,7 @@ class Handler:
         self._expiration = expiration
 
     def __copy__(self):
-        json_resp = dict()
+        json_resp = {}
         json_resp.update(self._resp_json)
         new_handler = Handler(
             handler_obj=self._handler_obj,

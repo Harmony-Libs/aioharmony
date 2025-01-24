@@ -410,8 +410,7 @@ async def run():
         required=False,
         choices=[WEBSOCKETS, XMPP],
         help=(
-            "Protocol to use to connect to HUB. Note for XMPP one has to ensure that XMPP is enabled"
-            "on the hub."
+            "Protocol to use to connect to HUB. Note for XMPP one has to ensure that XMPP is enabledon the hub."
         ),
     )
     parser.add_argument(
@@ -539,8 +538,7 @@ async def run():
         "--delay_secs",
         type=float,
         default=0.4,
-        help="Delay between sending commands. Not used if only "
-        "sending a single command. Defaults to 0.4 seconds",
+        help="Delay between sending commands. Not used if only sending a single command. Defaults to 0.4 seconds",
     )
     command_parser.add_argument(
         "--hold_secs",
@@ -591,7 +589,7 @@ async def run():
             hub_tasks.append(asyncio.ensure_future(execute_per_hub(hub, args)))
 
         results = await asyncio.gather(*hub_tasks, return_exceptions=True)
-        for idx, result in enumerate(results):
+        for result in results:
             if isinstance(result, Exception):
                 raise result
 
@@ -603,7 +601,7 @@ def cancel_tasks(loop):
         task.cancel()
 
     # Allow cancellations to be processed
-    for x in range(10):
+    for _x in range(10):
         loop.run_until_complete(asyncio.sleep(1))
         if len(asyncio.all_tasks(loop)) == 0:
             break

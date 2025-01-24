@@ -167,8 +167,7 @@ class HubConnector:
                 elif isinstance(exc, aiohttp.ClientError):
                     _LOGGER.log(
                         log_level,
-                        "%s: Exception trying to establish web "
-                        "socket connection for hub %s: %s",
+                        "%s: Exception trying to establish web socket connection for hub %s: %s",
                         self._ip_address,
                         self._remote_id,
                         exc,
@@ -176,8 +175,7 @@ class HubConnector:
                 else:
                     _LOGGER.log(
                         log_level,
-                        "%s: Invalid status code %s received "
-                        "trying to connect for hub %s: %s",
+                        "%s: Invalid status code %s received trying to connect for hub %s: %s",
                         self._ip_address,
                         exc.status,
                         self._remote_id,

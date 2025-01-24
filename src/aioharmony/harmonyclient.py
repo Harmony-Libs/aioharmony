@@ -371,8 +371,7 @@ class HarmonyClient:
 
         if response.get("code") != 200:
             _LOGGER.error(
-                "%s: Incorrect status code %s received trying to "
-                "get configuration for %s",
+                "%s: Incorrect status code %s received trying to get configuration for %s",
                 self.name,
                 response.get("code"),
                 self._ip_address,
@@ -382,25 +381,25 @@ class HarmonyClient:
         self._hub_config = self._hub_config._replace(config=response.get("data"))
 
         self._hub_config = self._hub_config._replace(
-            activities=list(
+            activities=[
                 {
                     "name": a["label"],
                     "name_lowercase": a["label"].lower(),
                     "id": int(a["id"]),
                 }
                 for a in self._hub_config.config.get("activity")
-            )
+            ]
         )
 
         self._hub_config = self._hub_config._replace(
-            devices=list(
+            devices=[
                 {
                     "name": a["label"],
                     "name_lowercase": a["label"].lower(),
                     "id": int(a["id"]),
                 }
                 for a in self._hub_config.config.get("device")
-            )
+            ]
         )
 
         return self._hub_config.config
@@ -435,8 +434,7 @@ class HarmonyClient:
         if result is not None:
             if result.get("code") != 200 and result.get("code") != "200":
                 _LOGGER.error(
-                    "%s: Incorrect status code %s received trying to "
-                    "get provisioning info for %s",
+                    "%s: Incorrect status code %s received trying to get provisioning info for %s",
                     self.name,
                     result.get("code"),
                     self._ip_address,
@@ -473,8 +471,7 @@ class HarmonyClient:
         if result is not None:
             if result.get("code") != 200 and result.get("code") != "200":
                 _LOGGER.error(
-                    "%s: Incorrect status code %s received trying to "
-                    "get provisioning info for %s",
+                    "%s: Incorrect status code %s received trying to get provisioning info for %s",
                     self.name,
                     result.get("code"),
                     self._ip_address,
@@ -597,8 +594,7 @@ class HarmonyClient:
 
         if response.get("code") != 200:
             _LOGGER.error(
-                "%s: Incorrect status code %s received trying to get"
-                "current activity for %s",
+                "%s: Incorrect status code %s received trying to getcurrent activity for %s",
                 self.name,
                 response.get("code"),
                 self._ip_address,
@@ -986,9 +982,7 @@ class HarmonyClient:
             "status": "press",
             "timestamp": "0",
             "verb": "render",
-            "action": f'{{"command":: "{command.command}",'
-            '"type":: "IRCommand",'
-            f'"deviceId":: "{command.device}"}}',
+            "action": f'{{"command":: "{command.command}","type":: "IRCommand","deviceId":: "{command.device}"}}',
         }
         msgid_press = str(uuid4())
 
@@ -1017,8 +1011,7 @@ class HarmonyClient:
         )
 
         _LOGGER.debug(
-            "%s: Sending command %s to device %s (%s) with delay "
-            "%ss has been completed",
+            "%s: Sending command %s to device %s (%s) with delay %ss has been completed",
             self.name,
             command.command,
             self.get_device_name(command.device),
