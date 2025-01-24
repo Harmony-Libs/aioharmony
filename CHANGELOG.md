@@ -1,6 +1,15 @@
 # CHANGELOG
 
 
+## v0.3.0 (2025-01-24)
+
+### Features
+
+- Use eager start to callback task on Python 3.12+
+  ([#60](https://github.com/Harmony-Libs/aioharmony/pull/60),
+  [`ab912d5`](https://github.com/Harmony-Libs/aioharmony/commit/ab912d5d477f3a0488fb0d1bdbb3228d96f60bc7))
+
+
 ## v0.2.14 (2025-01-24)
 
 ### Bug Fixes
