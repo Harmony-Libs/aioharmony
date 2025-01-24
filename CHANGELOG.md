@@ -1,6 +1,15 @@
 # CHANGELOG
 
 
+## v0.2.13 (2025-01-24)
+
+### Bug Fixes
+
+- Ensure cancellation is not swallowed on connect failure and in response handlers
+  ([#57](https://github.com/Harmony-Libs/aioharmony/pull/57),
+  [`d805a4a`](https://github.com/Harmony-Libs/aioharmony/commit/d805a4a70b792c84d4ff357518dec22b287225b1))
+
+
 ## v0.2.12 (2025-01-24)
 
 ### Bug Fixes

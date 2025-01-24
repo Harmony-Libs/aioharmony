@@ -8,6 +8,7 @@ the HUB through callbacks.
 
 import asyncio
 import logging
+import sys
 from datetime import datetime, timedelta, timezone
 from re import Pattern
 from typing import NamedTuple, Optional, Union
@@ -312,6 +313,12 @@ class ResponseHandler:
 
             except asyncio.CancelledError:
                 _LOGGER.debug("%s: Received STOP for callback handler", self._name)
+                if (
+                    sys.version_info >= (3, 11)
+                    and (task := asyncio.current_task())
+                    and task.cancelling()
+                ):
+                    raise
                 break
 
             # Need to catch everything here to prevent an issue in a
