@@ -61,7 +61,7 @@ class HarmonyClient:
             if callbacks is not None
             else ClientCallbackType(None, None, None, None, None)
         )
-        self._loop = loop if loop else asyncio.get_event_loop()
+        self._loop = loop if loop else asyncio.get_running_loop()
 
         self._hub_config = ClientConfigType({}, {}, {}, {}, None, [], [])
         self._current_activity_id = None
