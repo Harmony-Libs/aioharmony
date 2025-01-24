@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.2.14 (2025-01-24)
+
+### Bug Fixes
+
+- Prefer WebSockets over XMPP ([#58](https://github.com/Harmony-Libs/aioharmony/pull/58),
+  [`381ec77`](https://github.com/Harmony-Libs/aioharmony/commit/381ec7759c9985d80698b19d99303549a601684a))
+
+
 ## v0.2.13 (2025-01-24)
 
 ### Bug Fixes
