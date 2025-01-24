@@ -21,6 +21,8 @@ from aioharmony.const import DEFAULT_WS_HUB_PORT as DEFAULT_HUB_PORT
 from aioharmony.const import ConnectorCallbackType
 from aioharmony.helpers import call_callback
 
+from .json import json_dumps, json_loads
+
 DEFAULT_DOMAIN = "svcs.myharmony.com"
 DEFAULT_TIMEOUT = 5
 
@@ -100,7 +102,7 @@ class HubConnector:
 
         session_timeout = aiohttp.ClientTimeout(connect=DEFAULT_TIMEOUT)
         self._aiohttp_session = aiohttp.ClientSession(
-            connector=conn, timeout=session_timeout
+            connector=conn, timeout=session_timeout, json_serialize=json_dumps
         )
         return self._aiohttp_session
 
@@ -330,7 +332,7 @@ class HubConnector:
             async with self._session.post(
                 url, json=json_request, headers=headers
             ) as response:
-                json_response = await response.json(content_type=None)
+                json_response = await response.json(content_type=None, loads=json_loads)
                 _LOGGER.debug("%s: Post response: %s", self._ip_address, json_response)
         except aiohttp.ClientError as exc:
             _LOGGER.error("%s: Exception on post: %s", self._ip_address, exc)
@@ -391,7 +393,7 @@ class HubConnector:
                 if response.type is not aiohttp.WSMsgType.TEXT:
                     continue
 
-                response_json = response.json()
+                response_json = response.json(loads=json_loads)
                 if not response_json:
                     continue
 
