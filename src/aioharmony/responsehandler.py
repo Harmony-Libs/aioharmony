@@ -10,7 +10,7 @@ import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
 from re import Pattern
-from typing import List, NamedTuple, Optional, Tuple, Union
+from typing import NamedTuple, Optional, Union
 from uuid import uuid4
 
 from aioharmony.handler import Handler
@@ -20,9 +20,9 @@ DEFAULT_TIMEOUT = 60
 
 _LOGGER = logging.getLogger(__name__)
 
-DataPatternType = Tuple[str, Pattern]
+DataPatternType = tuple[str, Pattern]
 
-RespDataPatternType = Union[List[DataPatternType], DataPatternType]
+RespDataPatternType = Union[list[DataPatternType], DataPatternType]
 
 
 class CallbackEntryType(NamedTuple):
@@ -196,7 +196,7 @@ class ResponseHandler:
 
         return value == message
 
-    def _get_handlers(self, message: dict) -> List[CallbackEntryType]:
+    def _get_handlers(self, message: dict) -> list[CallbackEntryType]:
         """
         Find the handlers to be called for the JSON message received
 

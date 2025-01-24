@@ -5,13 +5,13 @@ This only contains some helper routines that are used.
 import asyncio
 import logging
 from functools import partial
-from typing import List, Optional, Set
+from typing import Optional
 
 from aioharmony.handler import CallbackType
 
 _LOGGER = logging.getLogger(__name__)
 
-_CALLBACK_TASKS: Set[asyncio.Task] = set()
+_CALLBACK_TASKS: set[asyncio.Task] = set()
 
 
 # pylint: disable=broad-except
@@ -130,7 +130,7 @@ def call_raw_callback(
 
 
 def search_dict(
-    match_value: object = None, key: str = None, search_list: List[dict] = None
+    match_value: object = None, key: str = None, search_list: list[dict] = None
 ) -> Optional[dict]:
     """
     Returns the 1st element in a list containing dictionaries

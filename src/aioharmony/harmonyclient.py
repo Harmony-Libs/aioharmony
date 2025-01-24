@@ -10,7 +10,7 @@ import asyncio
 import copy
 import logging
 from datetime import timedelta
-from typing import List, Optional, Tuple, Union
+from typing import Optional, Union
 from uuid import uuid4
 
 from async_timeout import timeout
@@ -875,8 +875,8 @@ class HarmonyClient:
         return status
 
     async def send_commands(
-        self, commands: List[SendCommand]
-    ) -> List[SendCommandResponse]:
+        self, commands: list[SendCommand]
+    ) -> list[SendCommandResponse]:
         _LOGGER.debug("%s: Sending commands to HUB", self.name)
         # Get the lock ensuring we're the only ones able to initiate
         command_future_list = []
@@ -962,7 +962,7 @@ class HarmonyClient:
 
     async def _send_command(
         self, command: SendCommandDevice, callback_handler: Handler
-    ) -> Tuple[Optional[str], Optional[str]]:
+    ) -> tuple[Optional[str], Optional[str]]:
         """
         Send a command to specified device
 

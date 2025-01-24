@@ -404,9 +404,7 @@ async def run():
     )
 
     # Flags with default values go here.
-    loglevels = dict(
-        (logging.getLevelName(level), level) for level in [10, 20, 30, 40, 50]
-    )
+    loglevels = {logging.getLevelName(level): level for level in [10, 20, 30, 40, 50]}
     parser.add_argument(
         "--protocol",
         required=False,

@@ -3,7 +3,7 @@ Constants used throughout the modules
 """
 
 import asyncio
-from typing import Any, Callable, List, NamedTuple, Optional, Union
+from typing import Any, Callable, NamedTuple, Optional, Union
 
 #
 # DEFAULT values
@@ -69,8 +69,8 @@ class ClientConfigType(NamedTuple):
     discover_info: dict
     hub_state: dict
     config_version: Optional[int]
-    activities: List[dict]
-    devices: List[dict]
+    activities: list[dict]
+    devices: list[dict]
 
 
 # Type for a command to send to the HUB
@@ -82,7 +82,7 @@ class SendCommandDevice(NamedTuple):
 
 # Type for send command to aioharmony,
 SendCommand = Union[SendCommandDevice, Union[float, int]]
-SendCommandArg = Union[SendCommand, List[SendCommand]]
+SendCommandArg = Union[SendCommand, list[SendCommand]]
 
 
 # Response from send commands.

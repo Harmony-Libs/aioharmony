@@ -12,7 +12,7 @@ import asyncio
 import json
 import logging
 from datetime import datetime, timedelta
-from typing import List, Optional, Union
+from typing import Optional, Union
 
 from aioharmony.const import (
     PROTOCOL,
@@ -211,7 +211,7 @@ class HarmonyAPI:
 
     async def send_commands(
         self, commands: SendCommandArg
-    ) -> List[SendCommandResponse]:
+    ) -> list[SendCommandResponse]:
         if isinstance(commands, list):
             _LOGGER.debug("%s: Sending commands to HUB", self.name)
         else:

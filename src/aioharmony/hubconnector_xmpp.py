@@ -69,7 +69,7 @@ class HubConnector(slixmpp.ClientXMPP):
         self._init_super()
 
     def _init_super(self):
-        super(HubConnector, self).__init__(
+        super().__init__(
             DEFAULT_USER, DEFAULT_PASSWORD, plugin_config=self._plugin_config
         )
 
@@ -182,7 +182,7 @@ class HubConnector(slixmpp.ClientXMPP):
             )
 
             try:
-                super(HubConnector, self).connect(
+                super().connect(
                     address=(self._ip_address, DEFAULT_HUB_PORT),
                     disable_starttls=True,
                     use_ssl=False,
@@ -258,7 +258,7 @@ class HubConnector(slixmpp.ClientXMPP):
                 disconnect_result,
                 disposable=True,
             )
-            super(HubConnector, self).disconnect()
+            super().disconnect()
 
             # Wait till we're disconnected.
             try:
