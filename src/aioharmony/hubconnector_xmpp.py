@@ -149,7 +149,7 @@ class HubConnector(slixmpp.ClientXMPP):
             else:
                 log_level = 40
 
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             connected = loop.create_future()
 
             def connection_success(_):
@@ -252,7 +252,7 @@ class HubConnector(slixmpp.ClientXMPP):
             # reconnect.
             self._connected = False
 
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
             disconnected = loop.create_future()
 
             def disconnect_result(_):
