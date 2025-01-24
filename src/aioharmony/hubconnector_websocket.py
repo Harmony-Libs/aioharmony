@@ -29,7 +29,7 @@ _LOGGER = logging.getLogger(__name__)
 # TODO: Add docstyle comments
 # TODO: Clean up code styling
 
-_WS_TIMEOUT = ClientWSTimeout(ws_receive=DEFAULT_TIMEOUT, ws_close=None)
+_WS_TIMEOUT = ClientWSTimeout(ws_receive=None, ws_close=DEFAULT_TIMEOUT)
 
 
 # pylint: disable=too-many-instance-attributes
