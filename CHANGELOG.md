@@ -1,6 +1,15 @@
 # CHANGELOG
 
 
+## v0.4.1 (2025-01-24)
+
+### Bug Fixes
+
+- Call get_running_loop instead of get_event_loop
+  ([#63](https://github.com/Harmony-Libs/aioharmony/pull/63),
+  [`e424fe1`](https://github.com/Harmony-Libs/aioharmony/commit/e424fe1b93af0b9fc5aa10fcd5d19f98d81f6157))
+
+
 ## v0.4.0 (2025-01-24)
 
 ### Features
