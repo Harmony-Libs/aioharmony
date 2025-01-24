@@ -29,18 +29,13 @@ classifiers = [
     'Topic :: Home Automation',
     'Topic :: Software Development :: Libraries :: Python Modules'
 ]
+urls."Bug Tracker" = "https://github.com/harmony-libs/aioharmony/issues"
+urls.Changelog = "https://github.com/harmony-libs/aioharmony/blob/main/CHANGELOG.md"
+urls.repository = "https://github.com/harmony-libs/aioharmony"
 
 [project.scripts]
 aioharmony = "scripts.aioharmony:aioharmony"
 
-dependencies = [
-  'aiohttp',
-  'async-timeout',
-  'slixmpp'
-]
-urls."Bug Tracker" = "https://github.com/harmony-libs/aioharmony/issues"
-urls.Changelog = "https://github.com/harmony-libs/aioharmony/blob/main/CHANGELOG.md"
-urls.repository = "https://github.com/harmony-libs/aioharmony"
 
 [dependency-groups]
 dev = [
