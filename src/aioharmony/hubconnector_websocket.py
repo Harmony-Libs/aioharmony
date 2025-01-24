@@ -318,7 +318,7 @@ class HubConnector:
 
         _LOGGER.debug("%s: Sending payload: %s", self._ip_address, payload)
         try:
-            await self._websocket.send_json(payload)
+            await self._websocket.send_json(payload, dumps=json_dumps)
         except aiohttp.ClientError as exc:
             _LOGGER.error("%s: Exception sending payload: %s", self._ip_address, exc)
             return
