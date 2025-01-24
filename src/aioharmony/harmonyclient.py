@@ -18,7 +18,7 @@ from async_timeout import timeout
 import aioharmony.exceptions as aioexc
 import aioharmony.handler as handlers
 from aioharmony.const import (
-    DEFAULT_XMPP_HUB_PORT,
+    DEFAULT_WS_HUB_PORT,
     HUB_COMMANDS,
     PROTOCOL,
     WEBSOCKETS,
@@ -135,33 +135,35 @@ class HarmonyClient:
 
     async def _websocket_or_xmpp(self) -> bool:
         """
-        Determine if XMPP is enabled, if not fall-back to web sockets.
+        Determine if web sockets are enabled, if not fall-back to XMPP.
         """
-        if not self._protocol == WEBSOCKETS:
+        if self._protocol != XMPP:
             try:
                 _, _ = await asyncio.open_connection(
-                    host=self._ip_address, port=DEFAULT_XMPP_HUB_PORT
+                    host=self._ip_address, port=DEFAULT_WS_HUB_PORT
                 )
             except ConnectionRefusedError:
                 if self._protocol == XMPP:
                     _LOGGER.warning(
-                        "%s: XMPP is not enabled on this HUB, will be defaulting back to WEBSOCKETS.",
+                        "%s: WEBSOCKETS is not enabled on this HUB, will be defaulting back to XMPP.",
                         self.name,
                     )
                 else:
                     _LOGGER.debug(
-                        "%s: XMPP is not enabled, using web sockets.", self.name
+                        "%s: WEBSOCKETS is not enabled, using XMPP.", self.name
                     )
-                self._protocol = WEBSOCKETS
+                self._protocol = XMPP
             except OSError as exc:
                 _LOGGER.error(
-                    "%s: Unable to determine if XMPP is enabled: %s", self.name, exc
+                    "%s: Unable to determine if Websocket is available: %s",
+                    self.name,
+                    exc,
                 )
                 if self._protocol is None:
                     return False
             else:
-                _LOGGER.debug("%s: XMPP is enabled", self.name)
-                self._protocol = XMPP
+                _LOGGER.debug("%s: Websocket available", self.name)
+                self._protocol = WEBSOCKETS
 
         if self._protocol == WEBSOCKETS:
             _LOGGER.debug("%s: Using WEBSOCKETS", self.name)
