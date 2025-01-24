@@ -7,6 +7,7 @@ responses.
 import asyncio
 import json
 import logging
+import sys
 from typing import Optional
 from uuid import uuid4
 
@@ -215,6 +216,12 @@ class HubConnector(slixmpp.ClientXMPP):
                 )
                 # Remove the handlers.
                 remove_handlers()
+                if (
+                    sys.version_info >= (3, 11)
+                    and (task := asyncio.current_task())
+                    and task.cancelling()
+                ):
+                    raise
                 return False
             except OSError as exc:
                 _LOGGER.log(

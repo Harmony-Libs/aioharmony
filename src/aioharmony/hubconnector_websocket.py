@@ -7,6 +7,7 @@ responses.
 import asyncio
 import logging
 import socket
+import sys
 from contextlib import suppress
 from typing import Optional, Union
 from urllib.parse import urlparse
@@ -399,6 +400,12 @@ class HubConnector:
 
             except asyncio.CancelledError:
                 _LOGGER.debug("%s: Received STOP for listener", self._ip_address)
+                if (
+                    sys.version_info >= (3, 11)
+                    and (task := asyncio.current_task())
+                    and task.cancelling()
+                ):
+                    raise
                 break
 
             # pylint: disable=broad-except
