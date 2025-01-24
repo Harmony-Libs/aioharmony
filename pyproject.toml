@@ -4,7 +4,7 @@ requires = [ "setuptools" ]
 
 [project]
 name = "aioharmony"
-version = "0.3.0"
+version = "0.4.0"
 description = "syncio Python library for connecting to and controlling the Logitech Harmony"
 readme = "README.rst"
 license = { text = "Apache-2.0" }

@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.4.0 (2025-01-24)
+
+### Features
+
+- Use orjson if its installed ([#62](https://github.com/Harmony-Libs/aioharmony/pull/62),
+  [`cbb8a14`](https://github.com/Harmony-Libs/aioharmony/commit/cbb8a146916daca53498c102942223ca72179082))
+
+
 ## v0.3.0 (2025-01-24)
 
 ### Features
