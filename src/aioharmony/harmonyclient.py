@@ -308,7 +308,9 @@ class HarmonyClient:
                         return_exceptions=True,
                     )
             except asyncio.TimeoutError:
-                _LOGGER.error("%s: Timeout trying to retrieve configuraton.", self.name)
+                _LOGGER.error(
+                    "%s: Timeout trying to retrieve configuration.", self.name
+                )
                 raise aioexc.TimeOut
 
             for idx, result in enumerate(results):

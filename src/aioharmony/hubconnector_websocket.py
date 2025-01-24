@@ -408,7 +408,7 @@ class HubConnector:
         _LOGGER.debug("%s: Listener stopped.", self._ip_address)
 
         # If we exited the loop due to connection closed then
-        # call reconnect to deterimine if we should reconnect again.
+        # call reconnect to determine if we should reconnect again.
         if not have_connection:
             await self._reconnect()
 
