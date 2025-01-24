@@ -34,7 +34,7 @@ urls.Changelog = "https://github.com/harmony-libs/aioharmony/blob/main/CHANGELOG
 urls.repository = "https://github.com/harmony-libs/aioharmony"
 
 [project.scripts]
-aioharmony = "scripts.aioharmony:aioharmony"
+aioharmony = "aioharmony.__main__:main"
 
 
 [dependency-groups]
