@@ -1,6 +1,15 @@
 # CHANGELOG
 
 
+## v0.5.1 (2025-03-14)
+
+### Bug Fixes
+
+- Enable additional ruff rules and fix found issues
+  ([#75](https://github.com/Harmony-Libs/aioharmony/pull/75),
+  [`3b91a05`](https://github.com/Harmony-Libs/aioharmony/commit/3b91a0555d27341572c5a5fc53bffe4428cd16af))
+
+
 ## v0.5.0 (2025-03-14)
 
 ### Features
