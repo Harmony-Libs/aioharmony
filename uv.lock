@@ -1,4 +1,5 @@
 version = 1
+revision = 1
 requires-python = ">=3.9"
 
 [[package]]
@@ -24,7 +25,7 @@ wheels = [
 
 [[package]]
 name = "aioharmony"
-version = "0.4.1"
+version = "0.5.0"
 source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },

@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.5.0 (2025-03-14)
+
+### Features
+
+- Improve error logging ([#74](https://github.com/Harmony-Libs/aioharmony/pull/74),
+  [`996713e`](https://github.com/Harmony-Libs/aioharmony/commit/996713e1e0df69fc0d8560417c1f9c4d11cab91b))
+
+
 ## v0.4.1 (2025-01-24)
 
 ### Bug Fixes
