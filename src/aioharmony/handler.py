@@ -70,16 +70,13 @@ class Handler:
         self._expiration = expiration
 
     def __copy__(self):
-        json_resp = {}
-        json_resp.update(self._resp_json)
-        new_handler = Handler(
+        return Handler(
             handler_obj=self._handler_obj,
             handler_name=self._handler_name,
-            resp_json=json_resp,
+            resp_json=self._resp_json.copy(),
             once=self._once,
             expiration=self._expiration,
         )
-        return new_handler
 
     @property
     def handler_obj(self) -> CallbackType:

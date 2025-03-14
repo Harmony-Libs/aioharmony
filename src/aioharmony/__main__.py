@@ -81,8 +81,6 @@ async def just_listen(client, args):
         )
         client.register_handler(handler=listen_callback)
 
-    return
-
 
 async def listen_for_new_activities(client, _):
     def new_activity_starting(activity_info: tuple):
@@ -219,9 +217,8 @@ async def send_command(client, args):
 
     """
     device_id = None
-    if args.device_id.isdigit():
-        if client.get_device_name(int(args.device_id)):
-            device_id = args.device_id
+    if args.device_id.isdigit() and client.get_device_name(int(args.device_id)):
+        device_id = args.device_id
 
     if device_id is None:
         device_id = client.get_device_id(str(args.device_id).strip())
@@ -262,9 +259,8 @@ async def send_commands(client, args):
 
     """
     device_id = None
-    if args.device_id.isdigit():
-        if client.get_device_name(int(args.device_id)):
-            device_id = args.device_id
+    if args.device_id.isdigit() and client.get_device_name(int(args.device_id)):
+        device_id = args.device_id
 
     if device_id is None:
         device_id = client.get_device_id(str(args.device_id).strip())
@@ -369,8 +365,7 @@ async def execute_per_hub(hub, args):
         await asyncio.sleep(args.wait)
     else:
         _LOGGER.debug("%s: Waiting till cancelled", hub)
-        while True:
-            await asyncio.sleep(60)
+        await asyncio.Event.wait()
 
     if hub_client:
         _LOGGER.debug("%s: Closing connection to HUB.", hub)
@@ -384,7 +379,7 @@ async def execute_per_hub(hub, args):
 
 async def run():
     """Main method for the script."""
-    global hub_client
+    global hub_client  # noqa: PLW0602
 
     parser = argparse.ArgumentParser(
         description="aioharmony - Harmony device control",
@@ -582,11 +577,9 @@ async def run():
             parser.print_help()
             return
 
-        hub_tasks = []
         hub_ips = args.harmony_ip.split(",")
-        for hub in hub_ips:
-            # Connect to the HUB
-            hub_tasks.append(asyncio.create_task(execute_per_hub(hub, args)))
+        # Connect to the HUB
+        hub_tasks = [asyncio.create_task(execute_per_hub(hub, args)) for hub in hub_ips]
 
         results = await asyncio.gather(*hub_tasks, return_exceptions=True)
         for result in results:

@@ -191,9 +191,7 @@ class ResponseHandler:
             return False
 
         if isinstance(value, Pattern):
-            if value.search(message) is None:
-                return False
-            return True
+            return value.search(message) is not None
 
         return value == message
 
@@ -208,25 +206,25 @@ class ResponseHandler:
         """
         callback_list = []
         for handler in self._handler_list:
-            if handler.msgid is not None:
-                if message.get("id") is None or message.get("id") != handler.msgid:
-                    _LOGGER.debug(
-                        "%s: No match on msgid for %s",
-                        self._name,
-                        handler.handler.handler_name,
-                    )
-                    continue
+            if handler.msgid is not None and (
+                message.get("id") is None or message.get("id") != handler.msgid
+            ):
+                _LOGGER.debug(
+                    "%s: No match on msgid for %s",
+                    self._name,
+                    handler.handler.handler_name,
+                )
+                continue
 
-            if handler.handler.resp_json is not None:
-                if not self._handler_match(
-                    dict_list=handler.handler.resp_json, message=message
-                ):
-                    _LOGGER.debug(
-                        "%s: No match for handler %s",
-                        self._name,
-                        handler.handler.handler_name,
-                    )
-                    continue
+            if handler.handler.resp_json is not None and not self._handler_match(
+                dict_list=handler.handler.resp_json, message=message
+            ):
+                _LOGGER.debug(
+                    "%s: No match for handler %s",
+                    self._name,
+                    handler.handler.handler_name,
+                )
+                continue
 
             _LOGGER.debug("%s: Match for %s", self._name, handler.handler.handler_name)
             callback_list.append(handler)
@@ -254,17 +252,19 @@ class ResponseHandler:
 
         removed_expired = False
         for handler in handler_list:
-            if handler.expiration is not None:
-                if datetime.now(timezone.utc) > handler.expiration:
-                    _LOGGER.debug(
-                        "%s: Handler %s with UUID %s has expired, removing: %s",
-                        self._name,
-                        handler.handler.handler_name,
-                        handler.handler_uuid,
-                        handler.expiration.astimezone(),
-                    )
-                    self.unregister_handler(handler.handler_uuid)
-                    removed_expired = True
+            if (
+                handler.expiration is not None
+                and datetime.now(timezone.utc) > handler.expiration
+            ):
+                _LOGGER.debug(
+                    "%s: Handler %s with UUID %s has expired, removing: %s",
+                    self._name,
+                    handler.handler.handler_name,
+                    handler.handler_uuid,
+                    handler.expiration.astimezone(),
+                )
+                self.unregister_handler(handler.handler_uuid)
+                removed_expired = True
 
         return removed_expired
 
@@ -323,10 +323,8 @@ class ResponseHandler:
 
             # Need to catch everything here to prevent an issue in a
             # from causing the handler to exit.
-            except Exception as exc:
-                _LOGGER.exception(
-                    "%s: Exception in callback handler: %s", self._name, exc
-                )
+            except Exception:
+                _LOGGER.exception("%s: Exception in callback handler", self._name)
 
         # Reset the queue.
         self._message_queue = asyncio.Queue()

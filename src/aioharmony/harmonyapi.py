@@ -27,8 +27,8 @@ from aioharmony.harmonyclient import ClientCallbackType, HarmonyClient
 _LOGGER = logging.getLogger(__name__)
 
 # Making these types available for import.
-ClientConfigType = ClientConfigType
-SendCommandDevice = SendCommandDevice
+ClientConfigType = ClientConfigType  # noqa: PLW0127
+SendCommandDevice = SendCommandDevice  # noqa: PLW0127
 
 # TODO: Add docstyle comments
 # TODO: Clean up code styling

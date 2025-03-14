@@ -139,10 +139,7 @@ class HubConnector:
 
             _LOGGER.debug("%s: Connecting to hub", self._ip_address)
 
-            if is_reconnect:
-                log_level = 10
-            else:
-                log_level = 40
+            log_level = 10 if is_reconnect else 40
 
             if await self.get_remote_id() is None:
                 # No remote ID means no connect.
@@ -303,12 +300,11 @@ class HubConnector:
                 "Accept-Charset": "utf-8",
             }
             json_request = {"id ": msgid, "cmd": command, "params": {}}
-            response = asyncio.create_task(self.hub_post(url, json_request, headers))
-            return response
+            return asyncio.create_task(self.hub_post(url, json_request, headers))
 
         # Make sure we're connected.
         if not await self.hub_connect():
-            return
+            return None
 
         payload = {
             "hubId": self._remote_id,
@@ -319,9 +315,9 @@ class HubConnector:
         _LOGGER.debug("%s: Sending payload: %s", self._ip_address, payload)
         try:
             await self._websocket.send_json(payload, dumps=json_dumps)
-        except aiohttp.ClientError as exc:
-            _LOGGER.error("%s: Exception sending payload: %s", self._ip_address, exc)
-            return
+        except aiohttp.ClientError:
+            _LOGGER.exception("%s: Exception sending payload", self._ip_address)
+            return None
 
         return msgid
 
@@ -334,8 +330,8 @@ class HubConnector:
             ) as response:
                 json_response = await response.json(content_type=None, loads=json_loads)
                 _LOGGER.debug("%s: Post response: %s", self._ip_address, json_response)
-        except aiohttp.ClientError as exc:
-            _LOGGER.error("%s: Exception on post: %s", self._ip_address, exc)
+        except aiohttp.ClientError:
+            _LOGGER.exception("%s: Exception on post", self._ip_address)
         else:
             return json_response
 
@@ -363,10 +359,8 @@ class HubConnector:
 
                 try:
                     response = await websocket.receive()
-                except aiohttp.ClientError as exc:
-                    _LOGGER.error(
-                        "%s: Exception during receive: %s", self._ip_address, exc
-                    )
+                except aiohttp.ClientError:
+                    _LOGGER.exception("%s: Exception during receive", self._ip_address)
                     break
 
                 _LOGGER.debug(
@@ -415,10 +409,8 @@ class HubConnector:
             # pylint: disable=broad-except
             # Need to catch everything here to prevent an issue in a
             # callback from ever causing the handler to exit.
-            except Exception as exc:
-                _LOGGER.exception(
-                    "%s: Exception in listener: %s", self._ip_address, exc
-                )
+            except Exception:
+                _LOGGER.exception("%s: Exception in listener", self._ip_address)
 
         self._listener_task = None
         _LOGGER.debug("%s: Listener stopped.", self._ip_address)
