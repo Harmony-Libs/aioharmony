@@ -1,6 +1,14 @@
 # CHANGELOG
 
 
+## v0.5.2 (2025-03-14)
+
+### Bug Fixes
+
+- Correct typo in project description ([#76](https://github.com/Harmony-Libs/aioharmony/pull/76),
+  [`c4439cb`](https://github.com/Harmony-Libs/aioharmony/commit/c4439cba45230b18baf5ce64fda4851e6af199ca))
+
+
 ## v0.5.1 (2025-03-14)
 
 ### Bug Fixes
