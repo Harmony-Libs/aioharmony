@@ -52,16 +52,35 @@ dev = [
 target-version = "py39"
 line-length = 88
 lint.select = [
-  "B",   # flake8-bugbear
-#  "D",   # flake8-docstrings
-  "C4",  # flake8-comprehensions
-  "S",   # flake8-bandit
-  "F",   # pyflake
-  "E",   # pycodestyle
-  "W",   # pycodestyle
-  "UP",  # pyupgrade
-  "I",   # isort
-  "RUF", # ruff specific
+    "ASYNC", # async rules
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "S",   # flake8-bandit
+    "F",   # pyflake
+    "E",   # pycodestyle
+    "W",   # pycodestyle
+    "UP",  # pyupgrade
+    "I",   # isort
+    "LOG",  # log
+    "RUF", # ruff specific
+    "FLY", # flynt
+    "FURB", # refurb
+    "G", # flake8-logging-format   ,
+    "PERF", # Perflint
+    "PGH", # pygrep-hooks
+    "PIE", # flake8-pie
+    "PL", # pylint
+    "PT", # flake8-pytest-style
+    "PYI", # flake8-pyi
+    "RET", # flake8-return
+    "RSE", # flake8-raise    ,
+    "SIM", # flake8-simplify
+    "SLF", # flake8-self
+    "SLOT", # flake8-slots
+    "T100", # Trace found: {name} used
+    "T20", # flake8-print
+    "TID", # Tidy imports
+    "TRY", # tryceratops
 ]
 lint.ignore = [
   "D203", # 1 blank line required before class docstring
