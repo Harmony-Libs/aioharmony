@@ -357,7 +357,7 @@ class HubConnector:
             # to stop running out due to an exception.
             try:
                 if not websocket or websocket.closed:
-                    _LOGGER.debug("%s: Web socket has been closed")
+                    _LOGGER.debug("%s: Web socket has been closed", self._ip_address)
                     have_connection = False
                     break
 
@@ -387,7 +387,9 @@ class HubConnector:
                     break
 
                 if response.type is aiohttp.WSMsgType.ERROR:
-                    _LOGGER.error("%s: Response error", self._ip_address)
+                    _LOGGER.error(
+                        "%s: Response error: %s", self._ip_address, response.data
+                    )
                     continue
 
                 if response.type is not aiohttp.WSMsgType.TEXT:
