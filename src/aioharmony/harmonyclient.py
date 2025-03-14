@@ -153,11 +153,10 @@ class HarmonyClient:
                         "%s: WEBSOCKETS is not enabled, using XMPP.", self.name
                     )
                 self._protocol = XMPP
-            except OSError as exc:
-                _LOGGER.error(
-                    "%s: Unable to determine if Websocket is available: %s",
+            except OSError:
+                _LOGGER.exception(
+                    "%s: Unable to determine if Websocket is available",
                     self.name,
-                    exc,
                 )
                 if self._protocol is None:
                     return False
@@ -186,9 +185,8 @@ class HarmonyClient:
         :rtype: bool
         :raises: :class:`~aioharmony.exceptions.TimeOut`
         """
-        if self._hub_connection is None:
-            if not await self._websocket_or_xmpp():
-                return False
+        if self._hub_connection is None and not await self._websocket_or_xmpp():
+            return False
 
         try:
             async with timeout(DEFAULT_TIMEOUT):
@@ -310,7 +308,7 @@ class HarmonyClient:
                         return_exceptions=True,
                     )
             except asyncio.TimeoutError:
-                _LOGGER.error(
+                _LOGGER.exception(
                     "%s: Timeout trying to retrieve configuration.", self.name
                 )
                 raise aioexc.TimeOut
@@ -318,16 +316,13 @@ class HarmonyClient:
             for idx, result in enumerate(results):
                 if isinstance(result, aioexc.TimeOut):
                     # Timeout exception, just put out error then.
-                    if idx == 0:
-                        result_name = "config"
-                    else:
-                        result_name = "hub info"
+                    result_name = "config" if idx == 0 else "hub info"
 
                     _LOGGER.error(
                         "%s: Timeout trying to retrieve %s.", self.name, result_name
                     )
                     return
-                elif isinstance(result, Exception):
+                if isinstance(result, Exception):
                     # Other exception, raise it.
                     raise result
 
@@ -429,7 +424,7 @@ class HarmonyClient:
                         send_timeout=DEFAULT_TIMEOUT / 4,
                     )
             except (asyncio.TimeoutError, aioexc.TimeOut):
-                _LOGGER.error(
+                _LOGGER.exception(
                     "%s: Timeout trying to retrieve provisioning info.", self.name
                 )
 
@@ -466,7 +461,7 @@ class HarmonyClient:
                         send_timeout=DEFAULT_TIMEOUT / 4,
                     )
             except (asyncio.TimeoutError, aioexc.TimeOut):
-                _LOGGER.error(
+                _LOGGER.exception(
                     "%s: Timeout trying to retrieve discovery info.", self.name
                 )
 
@@ -585,7 +580,7 @@ class HarmonyClient:
                         command="get_current_activity", send_timeout=DEFAULT_TIMEOUT / 4
                     )
             except (asyncio.TimeoutError, aioexc.TimeOut):
-                _LOGGER.error(
+                _LOGGER.exception(
                     "%s: Second Timeout trying to retrieve current activity.", self.name
                 )
                 response = None

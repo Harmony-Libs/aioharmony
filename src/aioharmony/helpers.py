@@ -34,8 +34,8 @@ def call_callback(
             callback_name=callback_name,
         )
     # Catching everything here.
-    except Exception as exc:
-        _LOGGER.exception("Exception in %s: %s", callback_name, exc)
+    except Exception:
+        _LOGGER.exception("Exception in %s", callback_name)
         return False
 
     if not callback_result:

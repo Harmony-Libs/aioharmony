@@ -5,6 +5,7 @@ responses.
 """
 
 import asyncio
+import contextlib
 import json
 import logging
 import sys
@@ -144,11 +145,7 @@ class HubConnector(slixmpp.ClientXMPP):
 
             _LOGGER.debug("%s: Connecting to hub", self._ip_address)
 
-            if is_reconnect:
-                log_level = 10
-            else:
-                log_level = 40
-
+            log_level = 10 if is_reconnect else 40
             loop = asyncio.get_running_loop()
             connected = loop.create_future()
 
@@ -336,15 +333,13 @@ class HubConnector(slixmpp.ClientXMPP):
         """Send a payload request to Harmony Hub and return json response."""
         # Make sure we're connected.
         if not await self.hub_connect():
-            return
+            return None
 
         def result_callback(future_result):
             # This is done to ensure that any time out exceptions are
             # captured
-            try:
+            with contextlib.suppress(IqTimeout):
                 future_result.result()
-            except IqTimeout:
-                pass
 
         if not msgid:
             msgid = str(uuid4())
@@ -395,7 +390,6 @@ class HubConnector(slixmpp.ClientXMPP):
                 _LOGGER.error(
                     "%s: Invalid payload length of 0 received.",
                     self._ip_address,
-                    len(payload),
                 )
                 return
 
