@@ -1,6 +1,15 @@
 # CHANGELOG
 
 
+## v0.5.3 (2025-09-07)
+
+### Bug Fixes
+
+- Websocket connection drops on flaky WiFi networks
+  ([#88](https://github.com/Harmony-Libs/aioharmony/pull/88),
+  [`2347cc9`](https://github.com/Harmony-Libs/aioharmony/commit/2347cc956d33a4467aa4b96174d477eb114e77e9))
+
+
 ## v0.5.2 (2025-03-14)
 
 ### Bug Fixes
