@@ -166,10 +166,10 @@ class HarmonyClient:
 
         if self._protocol == WEBSOCKETS:
             _LOGGER.debug("%s: Using WEBSOCKETS", self.name)
-            from aioharmony.hubconnector_websocket import HubConnector
+            from aioharmony.hubconnector_websocket import HubConnector  # noqa: PLC0415
         else:
             _LOGGER.debug("%s: Using XMPP", self.name)
-            from aioharmony.hubconnector_xmpp import HubConnector
+            from aioharmony.hubconnector_xmpp import HubConnector  # noqa: PLC0415
 
         self._hub_connection = HubConnector(
             ip_address=self._ip_address,
