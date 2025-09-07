@@ -33,6 +33,7 @@ _LOGGER = logging.getLogger(__name__)
 # TODO: Clean up code styling
 
 _WS_TIMEOUT = ClientWSTimeout(ws_receive=None, ws_close=DEFAULT_TIMEOUT)
+_WS_HEARTBEAT = 30  # Send ping every 30s, expect pong within 15s
 
 
 # pylint: disable=too-many-instance-attributes
@@ -155,7 +156,7 @@ class HubConnector:
                 self._websocket = await self._session.ws_connect(
                     f"ws://{self._ip_address}:{DEFAULT_HUB_PORT}/?domain={self._domain}&hubId={self._remote_id}",
                     timeout=_WS_TIMEOUT,  # close timeout
-                    heartbeat=10,
+                    heartbeat=_WS_HEARTBEAT,
                 )
             except (
                 aiohttp.ServerTimeoutError,
