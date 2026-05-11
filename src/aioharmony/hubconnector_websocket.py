@@ -115,7 +115,7 @@ class HubConnector:
             if response is not None:
                 self._remote_id = response.get("activeRemoteId")
                 domain = urlparse(response.get("discoveryServer"))
-                self._domain = domain.netloc if domain.netloc else DEFAULT_DOMAIN
+                self._domain = domain.netloc or DEFAULT_DOMAIN
         return self._remote_id
 
     async def async_close_session(self) -> None:
