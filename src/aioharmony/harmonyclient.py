@@ -10,7 +10,6 @@ import asyncio
 import copy
 import logging
 from datetime import timedelta
-from typing import Optional, Union
 from uuid import uuid4
 
 from async_timeout import timeout
@@ -110,7 +109,7 @@ class HarmonyClient:
         return self._protocol
 
     @property
-    def name(self) -> Optional[str]:
+    def name(self) -> str | None:
         name = self._hub_config.discover_info.get("friendlyName")
         return name if name is not None else self._ip_address
 
@@ -338,7 +337,7 @@ class HarmonyClient:
                 callback_name="config_updated_callback",
             )
 
-    async def _get_config(self) -> Optional[dict]:
+    async def _get_config(self) -> dict | None:
         """
         Retrieves the Harmony device configuration.
 
@@ -401,7 +400,7 @@ class HarmonyClient:
 
         return self._hub_config.config
 
-    async def _retrieve_provision_info(self) -> Optional[dict]:
+    async def _retrieve_provision_info(self) -> dict | None:
         response = None
         result = None
         try:
@@ -478,7 +477,7 @@ class HarmonyClient:
                     discover_info=result.get("data")
                 )
 
-    async def _retrieve_hub_info(self) -> Optional[dict]:
+    async def _retrieve_hub_info(self) -> dict | None:
         """Retrieve some information from the Hub."""
         # Send the command to the HUB
 
@@ -506,7 +505,7 @@ class HarmonyClient:
         wait: bool = True,
         post: bool = False,
         send_timeout: int = DEFAULT_TIMEOUT,
-    ) -> Union[dict, bool]:
+    ) -> dict | bool:
         if msgid is None:
             msgid = str(uuid4())
 
@@ -957,7 +956,7 @@ class HarmonyClient:
 
     async def _send_command(
         self, command: SendCommandDevice, callback_handler: Handler
-    ) -> tuple[Optional[str], Optional[str]]:
+    ) -> tuple[str | None, str | None]:
         """
         Send a command to specified device
 
@@ -1017,7 +1016,7 @@ class HarmonyClient:
         )
         return msgid_press, msgid_release
 
-    def get_activity_id(self, activity_name) -> Optional[int]:
+    def get_activity_id(self, activity_name) -> int | None:
         """Find the activity ID for the provided activity name."""
         if activity_name is None:
             return None
@@ -1029,7 +1028,7 @@ class HarmonyClient:
         )
         return item.get("id") if item else None
 
-    def get_activity_name(self, activity_id) -> Optional[str]:
+    def get_activity_name(self, activity_id) -> str | None:
         """Find the activity name for the provided ID."""
         if activity_id is None:
             return None
@@ -1041,7 +1040,7 @@ class HarmonyClient:
         )
         return item.get("name") if item else None
 
-    def get_device_id(self, device_name) -> Optional[int]:
+    def get_device_id(self, device_name) -> int | None:
         """Find the device ID for the provided device name."""
         if device_name is None:
             return None
@@ -1053,7 +1052,7 @@ class HarmonyClient:
         )
         return item.get("id") if item else None
 
-    def get_device_name(self, device_id) -> Optional[str]:
+    def get_device_name(self, device_id) -> str | None:
         """Find the device name for the provided ID."""
         if device_id is None:
             return None

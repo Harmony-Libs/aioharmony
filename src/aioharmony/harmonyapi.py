@@ -12,7 +12,6 @@ import asyncio
 import json
 import logging
 from datetime import datetime, timedelta
-from typing import Optional, Union
 
 from aioharmony.const import (
     PROTOCOL,
@@ -63,23 +62,23 @@ class HarmonyAPI:
         return self._harmony_client.hub_config
 
     @property
-    def name(self) -> Optional[str]:
+    def name(self) -> str | None:
         return self._harmony_client.name
 
     @property
-    def email(self) -> Optional[str]:
+    def email(self) -> str | None:
         return self.hub_config.info.get("email")
 
     @property
-    def account_id(self) -> Optional[str]:
+    def account_id(self) -> str | None:
         return self.hub_config.info.get("accountId")
 
     @property
-    def fw_version(self) -> Optional[str]:
+    def fw_version(self) -> str | None:
         return self.hub_config.hub_state.get("hubSwVersion")
 
     @property
-    def hub_id(self) -> Optional[str]:
+    def hub_id(self) -> str | None:
         return self.hub_config.info.get("activeRemoteId")
 
     @property
@@ -132,16 +131,16 @@ class HarmonyAPI:
     def callbacks(self, value: ClientCallbackType) -> None:
         self._harmony_client.callbacks = value
 
-    def get_activity_id(self, activity_name) -> Optional[str]:
+    def get_activity_id(self, activity_name) -> str | None:
         return self._harmony_client.get_activity_id(activity_name=activity_name)
 
-    def get_activity_name(self, activity_id) -> Optional[str]:
+    def get_activity_name(self, activity_id) -> str | None:
         return self._harmony_client.get_activity_name(activity_id=activity_id)
 
-    def get_device_id(self, device_name) -> Optional[str]:
+    def get_device_id(self, device_name) -> str | None:
         return self._harmony_client.get_device_id(device_name=device_name)
 
-    def get_device_name(self, device_id) -> Optional[str]:
+    def get_device_name(self, device_id) -> str | None:
         return self._harmony_client.get_device_name(device_id=device_id)
 
     async def connect(self) -> bool:
@@ -154,7 +153,7 @@ class HarmonyAPI:
         self,
         handler: Handler,
         msgid: str = None,
-        expiration: Union[datetime, timedelta] = None,
+        expiration: datetime | timedelta = None,
     ) -> str:
         """
         Register a handler.
