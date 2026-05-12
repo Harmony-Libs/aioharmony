@@ -44,6 +44,7 @@ aioharmony = "aioharmony.__main__:main"
 [dependency-groups]
 dev = [
   "pytest>=8,<9",
+  "pytest-asyncio>=0.25.2",
   "pytest-cov>=6,<7",
 ]
 
@@ -178,9 +179,3 @@ match = "main"
 [tool.semantic_release.branches.noop]
 match = "(?!main$)"
 prerelease = true
-
-[tool.uv]
-dev-dependencies = [
-    "pytest-asyncio>=0.25.2",
-    "pytest-cov>=6.0.0",
-]

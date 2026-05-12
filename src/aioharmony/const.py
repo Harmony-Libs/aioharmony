@@ -4,7 +4,7 @@ Constants used throughout the modules
 
 import asyncio
 from collections.abc import Callable
-from typing import Any, NamedTuple, Union
+from typing import Any, NamedTuple
 
 #
 # DEFAULT values
@@ -18,7 +18,7 @@ DEFAULT_HARMONY_MIME = "vnd.logitech.harmony/vnd.logitech.harmony.engine"
 WEBSOCKETS = "WEBSOCKETS"
 XMPP = "XMPP"
 
-PROTOCOL = Union[WEBSOCKETS, XMPP]
+PROTOCOL = WEBSOCKETS | XMPP
 
 #
 # The HUB commands that can be send
@@ -46,7 +46,7 @@ HUB_COMMANDS = {
 #
 
 # Type for callback parameters
-CallbackType = Union[asyncio.Future, asyncio.Event, Callable[[object, Any | None], Any]]
+CallbackType = asyncio.Future | asyncio.Event | Callable[[object, Any | None], Any]
 
 
 class ClientCallbackType(NamedTuple):
@@ -80,8 +80,8 @@ class SendCommandDevice(NamedTuple):
 
 
 # Type for send command to aioharmony,
-SendCommand = Union[SendCommandDevice, float | int]
-SendCommandArg = Union[SendCommand, list[SendCommand]]
+SendCommand = SendCommandDevice | float | int
+SendCommandArg = SendCommand | list[SendCommand]
 
 
 # Response from send commands.

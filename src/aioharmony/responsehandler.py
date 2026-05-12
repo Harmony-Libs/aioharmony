@@ -11,7 +11,7 @@ import logging
 import sys
 from datetime import datetime, timedelta, timezone
 from re import Pattern
-from typing import NamedTuple, Union
+from typing import NamedTuple
 from uuid import uuid4
 
 from aioharmony.handler import Handler
@@ -23,7 +23,7 @@ _LOGGER = logging.getLogger(__name__)
 
 DataPatternType = tuple[str, Pattern]
 
-RespDataPatternType = Union[list[DataPatternType], DataPatternType]
+RespDataPatternType = list[DataPatternType] | DataPatternType
 
 
 class CallbackEntryType(NamedTuple):
