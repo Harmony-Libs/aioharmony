@@ -12,14 +12,13 @@ authors = [
   { name = "Erik Hendrix", email = "endrix_erik@hotmail.com" },
   { name = "J. Nick Koston", email = "nick@koston.org" },
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 classifiers = [
     'Framework :: AsyncIO',
     'Intended Audience :: Developers',
     'License :: OSI Approved :: Apache Software License',
     'Programming Language :: Python',
     'Programming Language :: Python :: 3',
-    'Programming Language :: Python :: 3.9',
     'Programming Language :: Python :: 3.10',
     'Programming Language :: Python :: 3.11',
     'Programming Language :: Python :: 3.12',
@@ -49,7 +48,7 @@ dev = [
 ]
 
 [tool.ruff]
-target-version = "py39"
+target-version = "py310"
 line-length = 88
 lint.select = [
     "ASYNC", # async rules
