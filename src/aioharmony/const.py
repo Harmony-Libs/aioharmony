@@ -4,7 +4,7 @@ Constants used throughout the modules
 
 import asyncio
 from collections.abc import Callable
-from typing import Any, NamedTuple
+from typing import Any, Literal, NamedTuple
 
 #
 # DEFAULT values
@@ -18,7 +18,7 @@ DEFAULT_HARMONY_MIME = "vnd.logitech.harmony/vnd.logitech.harmony.engine"
 WEBSOCKETS = "WEBSOCKETS"
 XMPP = "XMPP"
 
-PROTOCOL = WEBSOCKETS | XMPP
+PROTOCOL = Literal["WEBSOCKETS", "XMPP"]
 
 #
 # The HUB commands that can be send
