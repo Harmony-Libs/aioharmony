@@ -1,6 +1,44 @@
 # CHANGELOG
 
 
+## v1.0.3 (2026-05-12)
+
+### Bug Fixes
+
+- Stop reconnect retry loop on concurrent disconnect
+  ([#102](https://github.com/Harmony-Libs/aioharmony/pull/102),
+  [`844b5a3`](https://github.com/Harmony-Libs/aioharmony/commit/844b5a36d20e35c6e2cdf9d206c9a13ad6c9f3df))
+
+* fix: stop reconnect retry loop on concurrent disconnect
+
+_reconnect() set self._connected = False before its retry loop and never re-checked it, so a
+  hub_disconnect() that arrived while the loop was sleeping could not stop the next reconnect
+  attempt; a fresh connection would come back up and a dangling listener task would be left behind.
+
+The loop now re-reads _connected and _auto_reconnect between attempts (those flags mean "caller
+  wants us connected") and the spurious assignment that masked the check is removed. Fixes #95.
+
+* refactor: split reconnect-stop logging and autouse the no-sleep fixture
+
+Addresses code review on #102. Splits the retry-loop bail-out so the debug line distinguishes a
+  concurrent disconnect from auto_reconnect being turned off, and promotes the asyncio.sleep
+  monkeypatch to an autouse fixture so listener tests (which also reach _reconnect) no longer pay
+  the 1s backoff. Test runtime drops from ~7s to <1s.
+
+- Support slixmpp 1.10+ connect API ([#103](https://github.com/Harmony-Libs/aioharmony/pull/103),
+  [`d9b99ad`](https://github.com/Harmony-Libs/aioharmony/commit/d9b99ad48b57e6afd7b8ede22800aac249515525))
+
+slixmpp 1.10 replaced ClientXMPP.connect(address=, disable_starttls=, use_ssl=) with connect(host=,
+  port=) and moved the TLS toggles onto instance attributes (enable_starttls, enable_direct_tls).
+  Any aioharmony install picking up modern slixmpp blows up at hub_connect with "TypeError:
+  ClientXMPP.connect() got an unexpected keyword argument 'address'".
+
+Switches to the new call shape, sets the TLS attrs to False (Harmony Hubs speak plain XMPP on the
+  LAN), and bumps the minimum slixmpp to 1.10. Also drops the self.address = (None, None) cancel
+  workaround; the attribute no longer exists on modern slixmpp and cancel_connection_attempt() now
+  does what its name says. Fixes #93.
+
+
 ## v1.0.2 (2026-05-12)
 
 ### Bug Fixes
