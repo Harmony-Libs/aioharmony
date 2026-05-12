@@ -1,6 +1,40 @@
 # CHANGELOG
 
 
+## v1.0.0 (2026-05-12)
+
+### Features
+
+- Drop Python 3.9 support ([#97](https://github.com/Harmony-Libs/aioharmony/pull/97),
+  [`3b93e69`](https://github.com/Harmony-Libs/aioharmony/commit/3b93e697fecd086c847b13d3f353c44069555aee))
+
+* feat!: drop Python 3.9 support
+
+Bumps requires-python to >=3.10, drops the 3.9 entry from the CI matrix, the classifier list, the
+  ruff target-version, and the pyupgrade --py39-plus flag. Python 3.9 reaches end of life in October
+  2025.
+
+BREAKING CHANGE: Python 3.9 is no longer supported; minimum is now 3.10.
+
+* chore(pre-commit.ci): auto fixes
+
+* chore: modernize typing for py310 target
+
+ruff --fix consequence of bumping target-version to py310; converts Optional[X] to X | None and
+  Union[X, Y] to X | Y, drops now-unused typing imports, and moves Callable to collections.abc. Also
+  consolidates dev-dependencies into [dependency-groups] so the deprecated
+  [tool.uv].dev-dependencies block can be removed (pytest-asyncio joins the group, the duplicated
+  pytest-cov constraint is collapsed).
+
+---------
+
+Co-authored-by: pre-commit-ci[bot] <66853113+pre-commit-ci[bot]@users.noreply.github.com>
+
+### Breaking Changes
+
+- Python 3.9 is no longer supported; minimum is now 3.10.
+
+
 ## v0.5.3 (2025-09-07)
 
 ### Bug Fixes
