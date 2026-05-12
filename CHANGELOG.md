@@ -1,6 +1,24 @@
 # CHANGELOG
 
 
+## v1.0.2 (2026-05-12)
+
+### Bug Fixes
+
+- Trigger websocket reconnect on listener error paths
+  ([#96](https://github.com/Harmony-Libs/aioharmony/pull/96),
+  [`5e8b3a2`](https://github.com/Harmony-Libs/aioharmony/commit/5e8b3a2c2f962759e0b9e09784cc64d3e6de8f48))
+
+* fix: trigger websocket reconnect on listener error paths
+
+The listener exited without firing _reconnect() when receive() raised ClientError (the heartbeat
+  timeout path), when a WSMsgType.ERROR arrived, or when an unexpected exception bubbled up in the
+  loop body. WSMsgType.CLOSE and CLOSING were also not handled explicitly. Each path now sets
+  have_connection=False and breaks so _reconnect() fires.
+
+* refactor: use module-level frozenset for ws close-type membership check
+
+
 ## v1.0.1 (2026-05-12)
 
 ### Bug Fixes
