@@ -1,6 +1,25 @@
 # CHANGELOG
 
 
+## v1.0.1 (2026-05-12)
+
+### Bug Fixes
+
+- Protocol type alias raises TypeError at import
+  ([#100](https://github.com/Harmony-Libs/aioharmony/pull/100),
+  [`631371b`](https://github.com/Harmony-Libs/aioharmony/commit/631371b7a27029c869f9ef9049aae72f162e5ed9))
+
+fix: PROTOCOL type alias raises TypeError at import
+
+The typing modernization sweep replaced PROTOCOL = Union[WEBSOCKETS, XMPP] with PROTOCOL =
+  WEBSOCKETS | XMPP, but WEBSOCKETS and XMPP are str values not types, so the PEP 604 expression
+  evaluates "WEBSOCKETS" | "XMPP" at runtime and raises TypeError. Any "from aioharmony.const import
+  ..." now fails on import.
+
+The original Union[...] form was already semantically wrong (Union of string forward refs); the
+  intent was a string-literal type, so this lands as Literal["WEBSOCKETS", "XMPP"].
+
+
 ## v1.0.0 (2026-05-12)
 
 ### Features
