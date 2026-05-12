@@ -33,6 +33,13 @@ _LOGGER = logging.getLogger(__name__)
 
 _WS_TIMEOUT = ClientWSTimeout(ws_receive=None, ws_close=DEFAULT_TIMEOUT)
 _WS_HEARTBEAT = 30  # Send ping every 30s, expect pong within 15s
+_WS_CLOSE_TYPES = frozenset(
+    {
+        aiohttp.WSMsgType.CLOSED,
+        aiohttp.WSMsgType.CLOSE,
+        aiohttp.WSMsgType.CLOSING,
+    }
+)
 
 
 # pylint: disable=too-many-instance-attributes
@@ -360,14 +367,20 @@ class HubConnector:
                 try:
                     response = await websocket.receive()
                 except aiohttp.ClientError:
-                    _LOGGER.exception("%s: Exception during receive", self._ip_address)
+                    # Heartbeat timeout / connection reset surfaces here.
+                    # Must trigger reconnect, otherwise the integration stays offline.
+                    _LOGGER.warning(
+                        "%s: Exception during receive, will reconnect",
+                        self._ip_address,
+                    )
+                    have_connection = False
                     break
 
                 _LOGGER.debug(
                     "%s: Response payload: %s", self._ip_address, response.data
                 )
 
-                if response.type is aiohttp.WSMsgType.CLOSED:
+                if response.type in _WS_CLOSE_TYPES:
                     close_code = (
                         ""
                         if response.data is None
@@ -381,10 +394,13 @@ class HubConnector:
                     break
 
                 if response.type is aiohttp.WSMsgType.ERROR:
-                    _LOGGER.error(
-                        "%s: Response error: %s", self._ip_address, response.data
+                    _LOGGER.warning(
+                        "%s: Response error, will reconnect: %s",
+                        self._ip_address,
+                        response.data,
                     )
-                    continue
+                    have_connection = False
+                    break
 
                 if response.type is not aiohttp.WSMsgType.TEXT:
                     continue
@@ -410,7 +426,11 @@ class HubConnector:
             # Need to catch everything here to prevent an issue in a
             # callback from ever causing the handler to exit.
             except Exception:
-                _LOGGER.exception("%s: Exception in listener", self._ip_address)
+                _LOGGER.exception(
+                    "%s: Exception in listener, will reconnect", self._ip_address
+                )
+                have_connection = False
+                break
 
         self._listener_task = None
         _LOGGER.debug("%s: Listener stopped.", self._ip_address)
