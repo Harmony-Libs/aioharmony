@@ -217,3 +217,101 @@ async def test_listener_does_not_reconnect_when_auto_reconnect_disabled() -> Non
     hub_connect = await _run_listener_once(connector, fake_ws)
 
     assert hub_connect.await_count == 0
+
+
+@pytest.fixture
+def fast_sleep(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Replace asyncio.sleep inside the module so retry-loop tests are fast."""
+
+    async def _no_sleep(_delay: float) -> None:
+        return None
+
+    monkeypatch.setattr("aioharmony.hubconnector_websocket.asyncio.sleep", _no_sleep)
+
+
+@pytest.mark.asyncio
+async def test_reconnect_stops_when_disconnect_called_during_retry(
+    fast_sleep: None,
+) -> None:
+    """A concurrent hub_disconnect() must end the retry loop.
+
+    Regression for issue #95: previously _reconnect set self._connected = False
+    before its retry loop and never re-checked it, so a hub_disconnect() that
+    arrived mid-retry could not stop a subsequent reconnect attempt.
+    """
+    connector = _make_connector()
+    connector.async_close_session = AsyncMock()  # type: ignore[method-assign]
+
+    async def fail_then_disconnect(is_reconnect: bool = False) -> bool:
+        # Simulate hub_disconnect() running between retries.
+        connector._connected = False  # noqa: SLF001
+        return False
+
+    hub_connect = AsyncMock(side_effect=fail_then_disconnect)
+    connector.hub_connect = hub_connect  # type: ignore[method-assign]
+
+    await connector._reconnect()  # noqa: SLF001
+
+    # First attempt runs once, then the loop checks _connected and bails;
+    # without the fix it would keep retrying forever.
+    assert hub_connect.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_reconnect_stops_when_auto_reconnect_disabled_during_retry(
+    fast_sleep: None,
+) -> None:
+    """Flipping auto_reconnect off during retries must also stop the loop."""
+    connector = _make_connector()
+    connector.async_close_session = AsyncMock()  # type: ignore[method-assign]
+
+    async def fail_then_disable(is_reconnect: bool = False) -> bool:
+        connector._auto_reconnect = False  # noqa: SLF001
+        return False
+
+    hub_connect = AsyncMock(side_effect=fail_then_disable)
+    connector.hub_connect = hub_connect  # type: ignore[method-assign]
+
+    await connector._reconnect()  # noqa: SLF001
+
+    assert hub_connect.await_count == 1
+
+
+@pytest.mark.asyncio
+async def test_reconnect_retries_until_success(fast_sleep: None) -> None:
+    """The retry loop keeps trying with is_reconnect=True after the first miss."""
+    connector = _make_connector()
+    connector.async_close_session = AsyncMock()  # type: ignore[method-assign]
+
+    hub_connect = AsyncMock(side_effect=[False, False, True])
+    connector.hub_connect = hub_connect  # type: ignore[method-assign]
+
+    await connector._reconnect()  # noqa: SLF001
+
+    assert hub_connect.await_count == 3
+    # First call is the initial attempt; subsequent calls flag is_reconnect.
+    first_call_kwargs = hub_connect.await_args_list[0].kwargs
+    later_call_kwargs = hub_connect.await_args_list[-1].kwargs
+    assert first_call_kwargs.get("is_reconnect") is False
+    assert later_call_kwargs.get("is_reconnect") is True
+
+
+@pytest.mark.asyncio
+async def test_reconnect_does_not_clobber_connected_flag(
+    fast_sleep: None,
+) -> None:
+    """_reconnect must leave self._connected alone.
+
+    Regression for issue #95: _reconnect used to set self._connected = False
+    before the retry loop, conflating "currently connected" with "caller
+    wants us connected" and defeating any later mid-retry disconnect check.
+    """
+    connector = _make_connector()
+    connector.async_close_session = AsyncMock()  # type: ignore[method-assign]
+
+    hub_connect = AsyncMock(return_value=True)
+    connector.hub_connect = hub_connect  # type: ignore[method-assign]
+
+    await connector._reconnect()  # noqa: SLF001
+
+    assert connector._connected is True  # noqa: SLF001

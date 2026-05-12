@@ -282,13 +282,21 @@ class HubConnector:
         self._websocket = None
 
         is_reconnect = False
-        self._connected = False
         sleep_time = 1
-        await asyncio.sleep(sleep_time)
-        while not await self.hub_connect(is_reconnect=is_reconnect):
+        while True:
             await asyncio.sleep(sleep_time)
-            sleep_time = sleep_time * 2
-            sleep_time = min(sleep_time, 30)
+            # Re-check between attempts so a concurrent hub_disconnect() (or
+            # auto_reconnect being turned off) actually stops the retry loop;
+            # _connected reflects "caller wants us connected".
+            if not self._connected or not self._auto_reconnect:
+                _LOGGER.debug(
+                    "%s: Disconnect requested during reconnect, stopping",
+                    self._ip_address,
+                )
+                return
+            if await self.hub_connect(is_reconnect=is_reconnect):
+                return
+            sleep_time = min(sleep_time * 2, 30)
             is_reconnect = True
 
     async def hub_send(
