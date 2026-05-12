@@ -219,9 +219,14 @@ async def test_listener_does_not_reconnect_when_auto_reconnect_disabled() -> Non
     assert hub_connect.await_count == 0
 
 
-@pytest.fixture
+@pytest.fixture(autouse=True)
 def fast_sleep(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Replace asyncio.sleep inside the module so retry-loop tests are fast."""
+    """Replace asyncio.sleep inside the module so retry-loop tests are fast.
+
+    Applied to every test in this module; the listener tests also reach
+    _reconnect() via the listener exit path and would otherwise pay the 1s
+    initial backoff each.
+    """
 
     async def _no_sleep(_delay: float) -> None:
         return None
@@ -230,9 +235,7 @@ def fast_sleep(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.mark.asyncio
-async def test_reconnect_stops_when_disconnect_called_during_retry(
-    fast_sleep: None,
-) -> None:
+async def test_reconnect_stops_when_disconnect_called_during_retry() -> None:
     """A concurrent hub_disconnect() must end the retry loop.
 
     Regression for issue #95: previously _reconnect set self._connected = False
@@ -258,9 +261,7 @@ async def test_reconnect_stops_when_disconnect_called_during_retry(
 
 
 @pytest.mark.asyncio
-async def test_reconnect_stops_when_auto_reconnect_disabled_during_retry(
-    fast_sleep: None,
-) -> None:
+async def test_reconnect_stops_when_auto_reconnect_disabled_during_retry() -> None:
     """Flipping auto_reconnect off during retries must also stop the loop."""
     connector = _make_connector()
     connector.async_close_session = AsyncMock()  # type: ignore[method-assign]
@@ -278,7 +279,7 @@ async def test_reconnect_stops_when_auto_reconnect_disabled_during_retry(
 
 
 @pytest.mark.asyncio
-async def test_reconnect_retries_until_success(fast_sleep: None) -> None:
+async def test_reconnect_retries_until_success() -> None:
     """The retry loop keeps trying with is_reconnect=True after the first miss."""
     connector = _make_connector()
     connector.async_close_session = AsyncMock()  # type: ignore[method-assign]
@@ -297,9 +298,7 @@ async def test_reconnect_retries_until_success(fast_sleep: None) -> None:
 
 
 @pytest.mark.asyncio
-async def test_reconnect_does_not_clobber_connected_flag(
-    fast_sleep: None,
-) -> None:
+async def test_reconnect_does_not_clobber_connected_flag() -> None:
     """_reconnect must leave self._connected alone.
 
     Regression for issue #95: _reconnect used to set self._connected = False

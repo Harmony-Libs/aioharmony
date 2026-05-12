@@ -288,9 +288,15 @@ class HubConnector:
             # Re-check between attempts so a concurrent hub_disconnect() (or
             # auto_reconnect being turned off) actually stops the retry loop;
             # _connected reflects "caller wants us connected".
-            if not self._connected or not self._auto_reconnect:
+            if not self._connected:
                 _LOGGER.debug(
                     "%s: Disconnect requested during reconnect, stopping",
+                    self._ip_address,
+                )
+                return
+            if not self._auto_reconnect:
+                _LOGGER.debug(
+                    "%s: Auto-reconnect disabled during reconnect, stopping",
                     self._ip_address,
                 )
                 return
