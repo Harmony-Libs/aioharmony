@@ -33,6 +33,13 @@ _LOGGER = logging.getLogger(__name__)
 
 _WS_TIMEOUT = ClientWSTimeout(ws_receive=None, ws_close=DEFAULT_TIMEOUT)
 _WS_HEARTBEAT = 30  # Send ping every 30s, expect pong within 15s
+_WS_CLOSE_TYPES = frozenset(
+    {
+        aiohttp.WSMsgType.CLOSED,
+        aiohttp.WSMsgType.CLOSE,
+        aiohttp.WSMsgType.CLOSING,
+    }
+)
 
 
 # pylint: disable=too-many-instance-attributes
@@ -373,11 +380,7 @@ class HubConnector:
                     "%s: Response payload: %s", self._ip_address, response.data
                 )
 
-                if response.type in (
-                    aiohttp.WSMsgType.CLOSED,
-                    aiohttp.WSMsgType.CLOSE,
-                    aiohttp.WSMsgType.CLOSING,
-                ):
+                if response.type in _WS_CLOSE_TYPES:
                     close_code = (
                         ""
                         if response.data is None
