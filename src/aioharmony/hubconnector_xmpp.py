@@ -156,10 +156,6 @@ class HubConnector(slixmpp.ClientXMPP):
                 connected.set_exception(event)
                 self.cancel_connection_attempt()
                 self.del_event_handler("connected", connection_success)
-                # Doing below as for some reason cancel does not really
-                # cancel it. This will result in exception and it
-                # stopping.
-                self.address = (None, None)
 
             def remove_handlers():
                 # Remove the handlers.
@@ -178,11 +174,15 @@ class HubConnector(slixmpp.ClientXMPP):
                 disposable=True,
             )
 
+            # Harmony Hubs speak unencrypted XMPP on the local LAN; turn off
+            # the TLS negotiation slixmpp would otherwise attempt.
+            self.enable_starttls = False
+            self.enable_direct_tls = False
+
             try:
                 super().connect(
-                    address=(self._ip_address, DEFAULT_HUB_PORT),
-                    disable_starttls=True,
-                    use_ssl=False,
+                    host=self._ip_address,
+                    port=int(DEFAULT_HUB_PORT),
                 )
 
             except IqTimeout:

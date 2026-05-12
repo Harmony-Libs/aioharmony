@@ -35,7 +35,7 @@ urls.repository = "https://github.com/harmony-libs/aioharmony"
 dependencies = [
     "aiohttp>=3.11",
     "async-timeout>=4",
-    "slixmpp>=1.8",
+    "slixmpp>=1.10",
 ]
 
 [project.scripts]
