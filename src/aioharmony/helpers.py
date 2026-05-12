@@ -6,7 +6,6 @@ import asyncio
 import logging
 import sys
 from functools import partial
-from typing import Optional
 
 from aioharmony.handler import CallbackType
 
@@ -140,7 +139,7 @@ def call_raw_callback(
 
 def search_dict(
     match_value: object = None, key: str = None, search_list: list[dict] = None
-) -> Optional[dict]:
+) -> dict | None:
     """
     Returns the 1st element in a list containing dictionaries
     where the value of key provided matches the value provided.

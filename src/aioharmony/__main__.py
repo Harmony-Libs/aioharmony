@@ -9,7 +9,6 @@ import logging
 import re
 import sys
 from datetime import datetime
-from typing import Optional
 
 import aioharmony.exceptions
 from aioharmony.const import WEBSOCKETS, XMPP, ClientCallbackType
@@ -36,7 +35,7 @@ class LoggingFilter(logging.Filter):
         return False
 
 
-async def get_client(ip_address, protocol, show_responses) -> Optional[HarmonyAPI]:
+async def get_client(ip_address, protocol, show_responses) -> HarmonyAPI | None:
     client = HarmonyAPI(ip_address=ip_address, protocol=protocol)
 
     def output_response(message):

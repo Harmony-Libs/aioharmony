@@ -9,7 +9,6 @@ import contextlib
 import json
 import logging
 import sys
-from typing import Optional
 from uuid import uuid4
 
 import slixmpp
@@ -329,7 +328,7 @@ class HubConnector(slixmpp.ClientXMPP):
 
     async def hub_send(
         self, command, iq_type="get", params=None, msgid=None, post=False
-    ) -> Optional[str]:
+    ) -> str | None:
         """Send a payload request to Harmony Hub and return json response."""
         # Make sure we're connected.
         if not await self.hub_connect():

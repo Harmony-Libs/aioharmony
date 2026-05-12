@@ -9,7 +9,6 @@ import logging
 import socket
 import sys
 from contextlib import suppress
-from typing import Optional, Union
 from urllib.parse import urlparse
 from uuid import uuid4
 
@@ -107,7 +106,7 @@ class HubConnector:
         )
         return self._aiohttp_session
 
-    async def get_remote_id(self) -> Optional[str]:
+    async def get_remote_id(self) -> str | None:
         """Retrieve remote id from the HUB."""
         if self._remote_id is None:
             # We do not have the remoteId yet, get it first.
@@ -287,7 +286,7 @@ class HubConnector:
 
     async def hub_send(
         self, command, params, msgid=None, post=False
-    ) -> Optional[Union[str, dict]]:
+    ) -> str | dict | None:
         """Send a payload request to Harmony Hub and return json response."""
         if not msgid:
             msgid = str(uuid4())
@@ -322,7 +321,7 @@ class HubConnector:
 
         return msgid
 
-    async def hub_post(self, url, json_request, headers=None) -> Optional[dict]:
+    async def hub_post(self, url, json_request, headers=None) -> dict | None:
         """Post a json request and return the response."""
         _LOGGER.debug("%s: Sending post request: %s", self._ip_address, json_request)
         try:
@@ -421,7 +420,7 @@ class HubConnector:
         if not have_connection:
             await self._reconnect()
 
-    async def _retrieve_hub_info(self) -> Optional[dict]:
+    async def _retrieve_hub_info(self) -> dict | None:
         """Retrieve the harmony Hub information."""
         _LOGGER.debug("%s: Retrieving Harmony Hub information.", self._ip_address)
 

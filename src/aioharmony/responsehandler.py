@@ -11,7 +11,7 @@ import logging
 import sys
 from datetime import datetime, timedelta, timezone
 from re import Pattern
-from typing import NamedTuple, Optional, Union
+from typing import NamedTuple, Union
 from uuid import uuid4
 
 from aioharmony.handler import Handler
@@ -28,8 +28,8 @@ RespDataPatternType = Union[list[DataPatternType], DataPatternType]
 
 class CallbackEntryType(NamedTuple):
     handler_uuid: str
-    msgid: Optional[str]
-    expiration: Optional[datetime]
+    msgid: str | None
+    expiration: datetime | None
     handler: Handler
 
 
@@ -74,7 +74,7 @@ class ResponseHandler:
         self,
         handler: Handler,
         msgid: str = None,
-        expiration: Union[datetime, timedelta] = None,
+        expiration: datetime | timedelta = None,
     ) -> str:
         """
         Register a handler.

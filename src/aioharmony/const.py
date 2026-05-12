@@ -3,7 +3,8 @@ Constants used throughout the modules
 """
 
 import asyncio
-from typing import Any, Callable, NamedTuple, Optional, Union
+from collections.abc import Callable
+from typing import Any, NamedTuple, Union
 
 #
 # DEFAULT values
@@ -45,22 +46,20 @@ HUB_COMMANDS = {
 #
 
 # Type for callback parameters
-CallbackType = Union[
-    asyncio.Future, asyncio.Event, Callable[[object, Optional[Any]], Any]
-]
+CallbackType = Union[asyncio.Future, asyncio.Event, Callable[[object, Any | None], Any]]
 
 
 class ClientCallbackType(NamedTuple):
-    connect: Optional[CallbackType]
-    disconnect: Optional[CallbackType]
-    new_activity_starting: Optional[CallbackType]
-    new_activity: Optional[CallbackType]
-    config_updated: Optional[CallbackType]
+    connect: CallbackType | None
+    disconnect: CallbackType | None
+    new_activity_starting: CallbackType | None
+    new_activity: CallbackType | None
+    config_updated: CallbackType | None
 
 
 class ConnectorCallbackType(NamedTuple):
-    connect: Optional[CallbackType]
-    disconnect: Optional[CallbackType]
+    connect: CallbackType | None
+    disconnect: CallbackType | None
 
 
 class ClientConfigType(NamedTuple):
@@ -68,7 +67,7 @@ class ClientConfigType(NamedTuple):
     info: dict
     discover_info: dict
     hub_state: dict
-    config_version: Optional[int]
+    config_version: int | None
     activities: list[dict]
     devices: list[dict]
 
@@ -81,7 +80,7 @@ class SendCommandDevice(NamedTuple):
 
 
 # Type for send command to aioharmony,
-SendCommand = Union[SendCommandDevice, Union[float, int]]
+SendCommand = Union[SendCommandDevice, float | int]
 SendCommandArg = Union[SendCommand, list[SendCommand]]
 
 
