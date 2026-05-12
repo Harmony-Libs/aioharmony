@@ -45,7 +45,7 @@ class HarmonyAPI:
         loop: asyncio.AbstractEventLoop = None,
     ) -> None:
         _LOGGER.debug("%s: Initialize", ip_address)
-        loop = loop if loop else asyncio.get_running_loop()
+        loop = loop or asyncio.get_running_loop()
         self._harmony_client = HarmonyClient(
             ip_address=ip_address, protocol=protocol, callbacks=callbacks, loop=loop
         )
