@@ -26,9 +26,7 @@ async def rh_pair() -> AsyncIterator[tuple[ResponseHandler, asyncio.Queue]]:
     await asyncio.sleep(0)
 
 
-async def _wait_until(
-    predicate: Callable[[], object], *, timeout: float = 1.0
-) -> bool:
+async def _wait_until(predicate: Callable[[], object], *, timeout: float = 1.0) -> bool:
     """Yield to the event loop until ``predicate()`` returns truthy."""
     deadline = asyncio.get_running_loop().time() + timeout
     while not predicate():
