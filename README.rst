@@ -1,6 +1,10 @@
 aioharmony
 ==========
 
+.. image:: https://codecov.io/gh/Harmony-Libs/aioharmony/branch/main/graph/badge.svg
+   :target: https://codecov.io/gh/Harmony-Libs/aioharmony
+   :alt: Codecov
+
 Python library for programmatically using a Logitech Harmony Link or Ultimate Hub.
 
 This library originated from `iandday/pyharmony <https://github.com/iandday/pyharmony>`__ which was a fork
