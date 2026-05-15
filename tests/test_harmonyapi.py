@@ -9,12 +9,14 @@ import pytest
 
 from aioharmony import harmonyapi as harmonyapi_module
 from aioharmony.const import (
-    ClientCallbackType,
     ClientConfigType,
     SendCommandDevice,
     SendCommandResponse,
 )
 from aioharmony.handler import Handler
+from aioharmony.harmonyclient import ClientCallbackType
+
+ApiFixture = tuple["harmonyapi_module.HarmonyAPI", MagicMock]
 
 
 def _make_config(
@@ -45,7 +47,6 @@ def fake_client() -> MagicMock:
     client.current_activity_id = "12345"
     client.get_activity_name.return_value = "Watch TV"
     client.callbacks = ClientCallbackType(None, None, None, None, None)
-    # Async methods.
     client.connect = AsyncMock(return_value=True)
     client.close = AsyncMock(return_value=None)
     client.send_to_hub = AsyncMock()
@@ -56,11 +57,10 @@ def fake_client() -> MagicMock:
 
 
 @pytest.fixture
-def api(monkeypatch: pytest.MonkeyPatch, fake_client: MagicMock):
-    """Construct a HarmonyAPI wired to ``fake_client``.
-
-    The patch targets the class binding HarmonyAPI.__init__ references.
-    """
+def api(
+    monkeypatch: pytest.MonkeyPatch, fake_client: MagicMock
+) -> ApiFixture:
+    """Construct a HarmonyAPI wired to ``fake_client``."""
     factory = MagicMock(return_value=fake_client)
     monkeypatch.setattr(harmonyapi_module, "HarmonyClient", factory)
 
@@ -73,7 +73,7 @@ def api(monkeypatch: pytest.MonkeyPatch, fake_client: MagicMock):
     return instance, factory
 
 
-def test_init_forwards_arguments(api: tuple, fake_client: MagicMock) -> None:
+def test_init_forwards_arguments(api: ApiFixture, fake_client: MagicMock) -> None:
     _instance, factory = api
     factory.assert_called_once()
     kwargs = factory.call_args.kwargs
@@ -86,9 +86,9 @@ def test_init_forwards_arguments(api: tuple, fake_client: MagicMock) -> None:
 def test_init_without_loop_uses_running_loop(monkeypatch: pytest.MonkeyPatch) -> None:
     """When no loop is given the wrapper must call asyncio.get_running_loop."""
     fake_loop = MagicMock(name="loop")
-    monkeypatch.setattr(
-        harmonyapi_module.asyncio, "get_running_loop", lambda: fake_loop
-    )
+    fake_asyncio = MagicMock(name="asyncio")
+    fake_asyncio.get_running_loop.return_value = fake_loop
+    monkeypatch.setattr(harmonyapi_module, "asyncio", fake_asyncio)
     factory = MagicMock()
     monkeypatch.setattr(harmonyapi_module, "HarmonyClient", factory)
 
@@ -97,7 +97,7 @@ def test_init_without_loop_uses_running_loop(monkeypatch: pytest.MonkeyPatch) ->
     assert factory.call_args.kwargs["loop"] is fake_loop
 
 
-def test_simple_properties_proxy(api: tuple, fake_client: MagicMock) -> None:
+def test_simple_properties_proxy(api: ApiFixture, fake_client: MagicMock) -> None:
     instance, _ = api
     assert instance.ip_address == "10.0.0.5"
     assert instance.protocol == "WEBSOCKETS"
@@ -105,7 +105,7 @@ def test_simple_properties_proxy(api: tuple, fake_client: MagicMock) -> None:
     assert instance.hub_config is fake_client.hub_config
 
 
-def test_email_account_fw_hub_id(api: tuple, fake_client: MagicMock) -> None:
+def test_email_account_fw_hub_id(api: ApiFixture, fake_client: MagicMock) -> None:
     instance, _ = api
     fake_client.hub_config = _make_config(
         info={
@@ -121,7 +121,7 @@ def test_email_account_fw_hub_id(api: tuple, fake_client: MagicMock) -> None:
     assert instance.hub_id == "hub-9"
 
 
-def test_email_missing_keys_returns_none(api: tuple, fake_client: MagicMock) -> None:
+def test_email_missing_keys_returns_none(api: ApiFixture, fake_client: MagicMock) -> None:
     instance, _ = api
     fake_client.hub_config = _make_config()
     assert instance.email is None
@@ -131,7 +131,7 @@ def test_email_missing_keys_returns_none(api: tuple, fake_client: MagicMock) -> 
 
 
 def test_current_activity_returns_id_and_name(
-    api: tuple, fake_client: MagicMock
+    api: ApiFixture, fake_client: MagicMock
 ) -> None:
     instance, _ = api
     fake_client.current_activity_id = "777"
@@ -141,7 +141,7 @@ def test_current_activity_returns_id_and_name(
 
 
 def test_config_property_returns_inner_config(
-    api: tuple, fake_client: MagicMock
+    api: ApiFixture, fake_client: MagicMock
 ) -> None:
     instance, _ = api
     expected = {"activity": [], "device": []}
@@ -150,7 +150,7 @@ def test_config_property_returns_inner_config(
 
 
 def test_json_config_builds_activity_and_device_maps(
-    api: tuple, fake_client: MagicMock
+    api: ApiFixture, fake_client: MagicMock
 ) -> None:
     instance, _ = api
     fake_client.hub_config = _make_config(
@@ -190,28 +190,26 @@ def test_json_config_builds_activity_and_device_maps(
         "id": "100",
         "commands": ["PowerToggle", "VolumeUp"],
     }
-    # An action of "null" must be filtered out: empty command list remains.
     assert out["Devices"]["AVR"] == {"id": "200", "commands": []}
 
 
 def test_json_config_empty_when_config_missing(
-    api: tuple, fake_client: MagicMock
+    api: ApiFixture, fake_client: MagicMock
 ) -> None:
     instance, _ = api
     fake_client.hub_config = _make_config(config={})
     assert instance.json_config == {"Activities": {}, "Devices": {}}
 
 
-def test_callbacks_get_and_set(api: tuple, fake_client: MagicMock) -> None:
+def test_callbacks_get_and_set(api: ApiFixture, fake_client: MagicMock) -> None:
     instance, _ = api
     new_cb = ClientCallbackType(None, None, None, None, None)
     instance.callbacks = new_cb
     assert fake_client.callbacks is new_cb
-    # And re-reading proxies through to the client.
     assert instance.callbacks is new_cb
 
 
-def test_lookup_helpers_proxy(api: tuple, fake_client: MagicMock) -> None:
+def test_lookup_helpers_proxy(api: ApiFixture, fake_client: MagicMock) -> None:
     instance, _ = api
     fake_client.get_activity_id.return_value = "12"
     fake_client.get_activity_name.return_value = "Watch TV"
@@ -232,7 +230,7 @@ def test_lookup_helpers_proxy(api: tuple, fake_client: MagicMock) -> None:
 
 
 @pytest.mark.asyncio
-async def test_connect_close_proxy(api: tuple, fake_client: MagicMock) -> None:
+async def test_connect_close_proxy(api: ApiFixture, fake_client: MagicMock) -> None:
     instance, _ = api
     assert await instance.connect() is True
     fake_client.connect.assert_awaited_once()
@@ -241,7 +239,7 @@ async def test_connect_close_proxy(api: tuple, fake_client: MagicMock) -> None:
 
 
 def test_register_and_unregister_handler_proxy(
-    api: tuple, fake_client: MagicMock
+    api: ApiFixture, fake_client: MagicMock
 ) -> None:
     instance, _ = api
     fake_client.register_handler.return_value = "uuid-abc"
@@ -262,7 +260,7 @@ def test_register_and_unregister_handler_proxy(
 
 
 @pytest.mark.asyncio
-async def test_sync_success(api: tuple, fake_client: MagicMock) -> None:
+async def test_sync_success(api: ApiFixture, fake_client: MagicMock) -> None:
     instance, _ = api
     fake_client.send_to_hub.return_value = {"code": 200}
 
@@ -274,7 +272,7 @@ async def test_sync_success(api: tuple, fake_client: MagicMock) -> None:
 
 @pytest.mark.asyncio
 async def test_sync_returns_false_when_no_response(
-    api: tuple, fake_client: MagicMock
+    api: ApiFixture, fake_client: MagicMock
 ) -> None:
     instance, _ = api
     fake_client.send_to_hub.return_value = None
@@ -285,7 +283,7 @@ async def test_sync_returns_false_when_no_response(
 
 @pytest.mark.asyncio
 async def test_sync_returns_false_when_bad_code(
-    api: tuple, fake_client: MagicMock
+    api: ApiFixture, fake_client: MagicMock
 ) -> None:
     instance, _ = api
     fake_client.send_to_hub.return_value = {"code": 500}
@@ -295,7 +293,7 @@ async def test_sync_returns_false_when_bad_code(
 
 
 @pytest.mark.asyncio
-async def test_start_activity_proxy(api: tuple, fake_client: MagicMock) -> None:
+async def test_start_activity_proxy(api: ApiFixture, fake_client: MagicMock) -> None:
     instance, _ = api
     fake_client.start_activity.return_value = (True, None, None)
     assert await instance.start_activity("42") == (True, None, None)
@@ -304,7 +302,7 @@ async def test_start_activity_proxy(api: tuple, fake_client: MagicMock) -> None:
 
 @pytest.mark.asyncio
 async def test_send_commands_wraps_single_command(
-    api: tuple, fake_client: MagicMock
+    api: ApiFixture, fake_client: MagicMock
 ) -> None:
     instance, _ = api
     command = SendCommandDevice(device=100, command="VolumeUp", delay=0.0)
@@ -322,7 +320,7 @@ async def test_send_commands_wraps_single_command(
 
 @pytest.mark.asyncio
 async def test_send_commands_passes_list_through(
-    api: tuple, fake_client: MagicMock
+    api: ApiFixture, fake_client: MagicMock
 ) -> None:
     instance, _ = api
     commands = [
@@ -339,7 +337,7 @@ async def test_send_commands_passes_list_through(
 
 @pytest.mark.asyncio
 async def test_power_off_returns_first_tuple_element(
-    api: tuple, fake_client: MagicMock
+    api: ApiFixture, fake_client: MagicMock
 ) -> None:
     instance, _ = api
     fake_client.start_activity.return_value = (True, "ok", None)
@@ -349,7 +347,7 @@ async def test_power_off_returns_first_tuple_element(
 
 @pytest.mark.asyncio
 async def test_power_off_false_when_start_activity_fails(
-    api: tuple, fake_client: MagicMock
+    api: ApiFixture, fake_client: MagicMock
 ) -> None:
     instance, _ = api
     fake_client.start_activity.return_value = (False, "err", None)
@@ -357,7 +355,7 @@ async def test_power_off_false_when_start_activity_fails(
 
 
 @pytest.mark.asyncio
-async def test_change_channel_success(api: tuple, fake_client: MagicMock) -> None:
+async def test_change_channel_success(api: ApiFixture, fake_client: MagicMock) -> None:
     instance, _ = api
     fake_client.send_to_hub.return_value = {"code": 200}
     assert await instance.change_channel(42) is True
@@ -369,7 +367,7 @@ async def test_change_channel_success(api: tuple, fake_client: MagicMock) -> Non
 
 @pytest.mark.asyncio
 async def test_change_channel_returns_false_on_empty_response(
-    api: tuple, fake_client: MagicMock
+    api: ApiFixture, fake_client: MagicMock
 ) -> None:
     instance, _ = api
     fake_client.send_to_hub.return_value = None
@@ -378,7 +376,7 @@ async def test_change_channel_returns_false_on_empty_response(
 
 @pytest.mark.asyncio
 async def test_change_channel_returns_false_on_bad_code(
-    api: tuple, fake_client: MagicMock
+    api: ApiFixture, fake_client: MagicMock
 ) -> None:
     instance, _ = api
     fake_client.send_to_hub.return_value = {"code": 500}
