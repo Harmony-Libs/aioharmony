@@ -73,9 +73,7 @@ def api(monkeypatch: pytest.MonkeyPatch, fake_client: MagicMock):
     return instance, factory
 
 
-def test_init_forwards_arguments(
-    api: tuple, fake_client: MagicMock
-) -> None:
+def test_init_forwards_arguments(api: tuple, fake_client: MagicMock) -> None:
     _instance, factory = api
     factory.assert_called_once()
     kwargs = factory.call_args.kwargs
@@ -110,7 +108,11 @@ def test_simple_properties_proxy(api: tuple, fake_client: MagicMock) -> None:
 def test_email_account_fw_hub_id(api: tuple, fake_client: MagicMock) -> None:
     instance, _ = api
     fake_client.hub_config = _make_config(
-        info={"email": "user@example.com", "accountId": "acc-1", "activeRemoteId": "hub-9"},
+        info={
+            "email": "user@example.com",
+            "accountId": "acc-1",
+            "activeRemoteId": "hub-9",
+        },
         hub_state={"hubSwVersion": "4.15.250"},
     )
     assert instance.email == "user@example.com"
