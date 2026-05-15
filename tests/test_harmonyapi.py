@@ -57,9 +57,7 @@ def fake_client() -> MagicMock:
 
 
 @pytest.fixture
-def api(
-    monkeypatch: pytest.MonkeyPatch, fake_client: MagicMock
-) -> ApiFixture:
+def api(monkeypatch: pytest.MonkeyPatch, fake_client: MagicMock) -> ApiFixture:
     """Construct a HarmonyAPI wired to ``fake_client``."""
     factory = MagicMock(return_value=fake_client)
     monkeypatch.setattr(harmonyapi_module, "HarmonyClient", factory)
@@ -121,7 +119,9 @@ def test_email_account_fw_hub_id(api: ApiFixture, fake_client: MagicMock) -> Non
     assert instance.hub_id == "hub-9"
 
 
-def test_email_missing_keys_returns_none(api: ApiFixture, fake_client: MagicMock) -> None:
+def test_email_missing_keys_returns_none(
+    api: ApiFixture, fake_client: MagicMock
+) -> None:
     instance, _ = api
     fake_client.hub_config = _make_config()
     assert instance.email is None
