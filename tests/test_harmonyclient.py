@@ -40,7 +40,7 @@ def _make_client(**kwargs: Any) -> HarmonyClient:
 
 
 @pytest_asyncio.fixture
-async def client() -> AsyncGenerator[HarmonyClient, None]:
+async def client() -> AsyncGenerator[HarmonyClient]:
     c = _make_client()
     real_handler = c._callback_handler  # noqa: SLF001
     yield c
