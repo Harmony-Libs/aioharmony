@@ -6,7 +6,6 @@ responses.
 
 import asyncio
 import contextlib
-import json
 import logging
 import sys
 from uuid import uuid4
@@ -22,6 +21,7 @@ import aioharmony.exceptions as aioexc
 from aioharmony.const import DEFAULT_XMPP_HUB_PORT as DEFAULT_HUB_PORT
 from aioharmony.const import ConnectorCallbackType
 from aioharmony.helpers import call_callback
+from aioharmony.json import JSONDecodeError, json_loads
 
 DEFAULT_DOMAIN = "svcs.myharmony.com"
 DEFAULT_TIMEOUT = 5
@@ -397,8 +397,8 @@ class HubConnector(slixmpp.ClientXMPP):
                 # Try to convert JSON object if JSON object was received
                 if message.text is not None and message.text != "":
                     try:
-                        data = json.loads(message.text)
-                    except json.JSONDecodeError:
+                        data = json_loads(message.text)
+                    except JSONDecodeError:
                         # Should mean only a single value was received.
                         for item in message.text.split(":"):
                             item_split = item.split("=")
