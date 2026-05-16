@@ -9,7 +9,6 @@ Hub.
 """
 
 import asyncio
-import json
 import logging
 from datetime import datetime, timedelta
 
@@ -22,6 +21,7 @@ from aioharmony.const import (
 )
 from aioharmony.handler import Handler
 from aioharmony.harmonyclient import ClientCallbackType, HarmonyClient
+from aioharmony.json import json_loads
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -111,7 +111,7 @@ class HarmonyAPI:
             command_list = []
             for control_group in device.get("controlGroup", []):
                 for function in control_group.get("function", []):
-                    action = json.loads(function.get("action"))
+                    action = json_loads(function.get("action"))
                     if action is not None:
                         command_list.append(action.get("command"))
 

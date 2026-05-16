@@ -4,7 +4,6 @@
 
 import argparse
 import asyncio
-import json
 import logging
 import re
 import sys
@@ -13,6 +12,7 @@ from datetime import datetime
 import aioharmony.exceptions
 from aioharmony.const import WEBSOCKETS, XMPP, ClientCallbackType
 from aioharmony.harmonyapi import HarmonyAPI, SendCommandDevice
+from aioharmony.json import json_dumps_pretty
 from aioharmony.responsehandler import Handler
 
 # TODO: Add docstyle comments
@@ -128,7 +128,7 @@ async def show_config(client, _):
 
     if config:
         print(f"HUB: {client.name}")
-        print(f"\t {json.dumps(client.json_config, sort_keys=True, indent=4)}")
+        print(f"\t {json_dumps_pretty(client.json_config)}")
     else:
         print(f"HUB: {client.name} There was a problem retrieving the configuration")
 
@@ -141,9 +141,7 @@ async def show_detailed_config(client, _):
 
     if config:
         print(f"HUB: {client.name}")
-        print(
-            f"\t {json.dumps(client.hub_config, sort_keys=True, indent=4, separators=(',', ': '))}"
-        )
+        print(f"\t {json_dumps_pretty(client.hub_config)}")
     else:
         print(f"HUB: {client.name} There was a problem retrieving the configuration")
 
