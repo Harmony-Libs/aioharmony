@@ -50,7 +50,7 @@ aioharmony = "aioharmony.__main__:main"
 dev = [
   "pytest>=8,<10",
   "pytest-asyncio>=0.25.2",
-  "pytest-cov>=6,<7",
+  "pytest-cov>=6,<8",
 ]
 
 [tool.ruff]
