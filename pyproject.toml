@@ -121,6 +121,11 @@ lint.per-file-ignores."tests/**/*" = [
   "S101",
 ]
 lint.per-file-ignores."src/aioharmony/__main__.py" = [ "T201" ]
+lint.per-file-ignores."examples/**/*" = [
+  "D100",
+  "D103",
+  "T201",
+]
 lint.isort.known-first-party = [ "aioharmony", "tests" ]
 
 [tool.pytest.ini_options]
