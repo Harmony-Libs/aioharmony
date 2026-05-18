@@ -1,9 +1,7 @@
-"""
-This is module specifies the Handler class.
+"""Module specifying the Handler class.
 
 A number of HANDLER constants have been defined here, do not USE these,
 copy them instead.
-
 """
 
 import re
@@ -15,9 +13,9 @@ DEFAULT_TIMEOUT = 60
 
 
 class Handler:
-    """
-    This class is to be used to create Handler objects for registering new
-    callbacks through method
+    """Create Handler objects for registering new callbacks.
+
+    Used through method
     :meth:`aioharmony.client.HarmonyClient.register_handler`
 
     **handler_obj:** This parameter can accept one of the following types of
@@ -80,82 +78,42 @@ class Handler:
 
     @property
     def handler_obj(self) -> CallbackType:
-        """
-
-        :param value: New handler_obj
-        :type value: CallbackType
-        :return: Returns handler_obj
-        :rtype: CallbackType
-        """
         return self._handler_obj
 
     @handler_obj.setter
     def handler_obj(self, value: CallbackType) -> None:
-        """"""
         self._handler_obj = value
 
     @property
     def handler_name(self) -> str:
-        """
-
-        :param value: New handler_name
-        :type value: str
-        :return: Returns handler_name
-        :rtype: str
-        """
         return self._handler_name
 
     @handler_name.setter
     def handler_name(self, value: str) -> None:
-        """"""
         self._handler_name = value
 
     @property
     def resp_json(self) -> dict:
-        """
-
-        :param value: New resp_type
-        :type value: dict
-        :return: Returns resp_type
-        :rtype: dict
-        """
         return self._resp_json
 
     @resp_json.setter
     def resp_json(self, value: dict) -> None:
-        """"""
         self._resp_json = value
 
     @property
     def once(self) -> bool:
-        """
-
-        :param value: New once
-        :type value: bool
-        :return: Returns once
-        :rtype: bool
-        """
         return self._once
 
     @once.setter
     def once(self, value: bool) -> None:
-        """"""
         self._once = value
 
     @property
     def expiration(self) -> timedelta:
-        """
-
-        :param value: New expiration
-        :type value: timedelta
-        :return: Returns expiration
-        :rtype: timedelta
-        """
         return self._expiration
 
     @expiration.setter
     def expiration(self, value: timedelta) -> None:
-        """"""
         self._expiration = value
 
 

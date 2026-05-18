@@ -1,6 +1,6 @@
-"""
-This is the main module containing the class to be imported and used:
-from aioharmony.client import HarmonyClient
+"""Main module containing the class to be imported and used.
+
+Usage: ``from aioharmony.client import HarmonyClient``
 
 The HarmonyClient class represents the Harmony Hub. Using the methods of
 this class allows one to query or send commands to the Hub.
@@ -133,9 +133,7 @@ class HarmonyClient:
         return self._current_activity_id
 
     async def _websocket_or_xmpp(self) -> bool:
-        """
-        Determine if web sockets are enabled, if not fall-back to XMPP.
-        """
+        """Determine if web sockets are enabled, if not fall-back to XMPP."""
         if self._protocol != XMPP:
             try:
                 _, _ = await asyncio.open_connection(
@@ -178,9 +176,7 @@ class HarmonyClient:
         return True
 
     async def connect(self) -> bool:
-        """
-
-        :return: True if connection was successful, False if it was not.
+        """:return: True if connection was successful, False if it was not.
         :rtype: bool
         :raises: :class:`~aioharmony.exceptions.TimeOut`
         """
@@ -258,8 +254,7 @@ class HarmonyClient:
         return True
 
     async def close(self) -> None:
-        """
-        Close all connections and tasks
+        """Close all connections and tasks
 
         This should be called to ensure everything is stopped and
         cancelled out.
@@ -338,8 +333,7 @@ class HarmonyClient:
             )
 
     async def _get_config(self) -> dict | None:
-        """
-        Retrieves the Harmony device configuration.
+        """Retrieves the Harmony device configuration.
 
         Returns:
             A nested dictionary containing activities, devices, etc.
@@ -740,8 +734,7 @@ class HarmonyClient:
     # pylint: disable=too-many-statements
     # pylint: disable=too-many-locals
     async def start_activity(self, activity_id) -> tuple:
-        """
-        Starts an activity.
+        """Starts an activity.
 
         Args:
             activity_id: An int or string identifying the activity to start
@@ -957,8 +950,7 @@ class HarmonyClient:
     async def _send_command(
         self, command: SendCommandDevice, callback_handler: Handler
     ) -> tuple[str | None, str | None]:
-        """
-        Send a command to specified device
+        """Send a command to specified device
 
         :param command: Command to send to the device. (device, command, delay)
         :type command: SendCommandDevice
@@ -1063,8 +1055,7 @@ class HarmonyClient:
         return item.get("name") if item else None
 
     def register_handler(self, *args, **kwargs) -> str:
-        """
-        Exposes
+        """Exposes
         :meth:`aioharmony.responsehandler.ResponseHandler.register_handler` for
         use to register other callbacks.
 
@@ -1077,8 +1068,7 @@ class HarmonyClient:
         return self._callback_handler.register_handler(*args, **kwargs)
 
     def unregister_handler(self, *args, **kwargs) -> bool:
-        """
-        Exposes
+        """Exposes
         :meth:`aioharmony.responsehandler.ResponseHandler.unregister_handler`
         for use to unregister callbacks.
 

@@ -1,9 +1,7 @@
-"""
+"""Module containing the classes for the callback handler.
 
-This is the module contains the classes for the callback handler. It is used
-by :class:`~aioharmony.client.HarmonyClient` class to wait for responses from
-the HUB through callbacks.
-
+Used by :class:`~aioharmony.client.HarmonyClient` class to wait for responses
+from the HUB through callbacks.
 """
 
 import asyncio
@@ -34,9 +32,7 @@ class CallbackEntryType(NamedTuple):
 
 
 class ResponseHandler:
-    """
-
-    Class to listen for json responses on the queue and then call
+    """Class to listen for json responses on the queue and then call
     registered handlers based on search patterns.
 
     This class is used by :class:`~aioharmony.client.HarmonyClient`, there is
@@ -52,7 +48,6 @@ class ResponseHandler:
     """
 
     def __init__(self, message_queue: asyncio.Queue, name: str = None) -> None:
-        """"""
         self._message_queue = message_queue
         self._name = name
         self._handler_list = []
@@ -60,8 +55,7 @@ class ResponseHandler:
         self._callback_task = asyncio.create_task(self._callback_handler())
 
     async def close(self):
-        """
-        Close all connections and tasks
+        """Close all connections and tasks
 
         This should be called to ensure everything is stopped and
         cancelled out.
@@ -76,8 +70,7 @@ class ResponseHandler:
         msgid: str = None,
         expiration: datetime | timedelta = None,
     ) -> str:
-        """
-        Register a handler.
+        """Register a handler.
 
         :param handler: Handler object to be registered
         :type handler: Handler
@@ -133,8 +126,7 @@ class ResponseHandler:
         return handler_uuid
 
     def unregister_handler(self, handler_uuid: str) -> bool:
-        """
-        Unregister a handler.
+        """Unregister a handler.
 
         :param handler_uuid: Handler UUID, this is returned by
                              register_handler when registering the handler
@@ -196,8 +188,7 @@ class ResponseHandler:
         return value == message
 
     def _get_handlers(self, message: dict) -> list[CallbackEntryType]:
-        """
-        Find the handlers to be called for the JSON message received
+        """Find the handlers to be called for the JSON message received
 
         :param message: JSON message to use
         :type message: dict
@@ -234,8 +225,7 @@ class ResponseHandler:
     def _unregister_expired_handlers(
         self, single_handler: CallbackEntryType = None
     ) -> bool:
-        """
-        Unregisters any expired handlers based on their expiration
+        """Unregisters any expired handlers based on their expiration
         datetime. Will check the handler dict instead of the list if provided
         :param single_handler:  Handler dict as it is put in the handler
                                 list by register_handler.
@@ -270,8 +260,7 @@ class ResponseHandler:
 
     # pylint: disable=broad-except
     async def _callback_handler(self) -> None:
-        """
-        Listens on the queue for JSON messages and then processes them by
+        """Listens on the queue for JSON messages and then processes them by
         calling any handler(s)
         """
         _LOGGER.debug("%s: Callback handler started", self._name)

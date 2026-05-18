@@ -1,6 +1,6 @@
-"""
-This is the main module containing the class to be imported and used:
-from aioharmony.harmonyapi import HarmonyAPI
+"""Main module containing the class to be imported and used.
+
+Usage: ``from aioharmony.harmonyapi import HarmonyAPI``
 
 The HarmonyAPI class is a wrapper around the HarmonyClient class
 which represents the Harmony Hub.
@@ -155,8 +155,7 @@ class HarmonyAPI:
         msgid: str = None,
         expiration: datetime | timedelta = None,
     ) -> str:
-        """
-        Register a handler.
+        """Register a handler.
 
         :param handler: Handler object to be registered
         :type handler: Handler
@@ -180,8 +179,7 @@ class HarmonyAPI:
         )
 
     def unregister_handler(self, handler_uuid: str) -> bool:
-        """
-        Unregister a handler.
+        """Unregister a handler.
 
         :param handler_uuid: Handler UUID, this is returned by
                              register_handler when registering the handler
@@ -221,8 +219,7 @@ class HarmonyAPI:
         return await self._harmony_client.send_commands(commands=commands)
 
     async def power_off(self) -> bool:
-        """
-        Turns the system off if it's on, otherwise it does nothing.
+        """Turns the system off if it's on, otherwise it does nothing.
 
         Returns:
             True if the system becomes or is off
@@ -232,8 +229,7 @@ class HarmonyAPI:
         return result[0]
 
     async def change_channel(self, channel: int) -> bool:
-        """
-        Change channel
+        """Change channel
 
         :param channel: Channel number
         :type channel: int

@@ -1,8 +1,4 @@
-"""
-Connector class for connecting to send requests and receive
-
-responses.
-"""
+"""Connector class for sending requests and receiving responses."""
 
 import asyncio
 import logging
@@ -83,8 +79,7 @@ class HubConnector:
         self._callbacks = value
 
     async def close(self):
-        """
-        Close all connections and tasks
+        """Close all connections and tasks
 
         This should be called to ensure everything is stopped and
         cancelled out.
@@ -125,7 +120,7 @@ class HubConnector:
         return self._remote_id
 
     async def async_close_session(self) -> None:
-        """ "Close the aiohttp session."""
+        """Close the aiohttp session."""
         if self._aiohttp_session is None:
             return
         with suppress(asyncio.TimeoutError):
