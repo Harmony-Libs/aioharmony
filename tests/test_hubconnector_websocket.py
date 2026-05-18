@@ -482,6 +482,37 @@ async def test_hub_connect_handles_client_error() -> None:
 
 
 @pytest.mark.asyncio
+async def test_hub_connect_handles_handshake_error_with_status(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """WSServerHandshakeError is logged with its status, not as a generic ClientError."""
+    from multidict import CIMultiDict
+    from yarl import URL
+
+    request_info = aiohttp.RequestInfo(
+        url=URL("http://10.0.0.1:8088/"),
+        method="GET",
+        headers=CIMultiDict(),
+    )
+    handshake_exc = aiohttp.WSServerHandshakeError(
+        request_info=request_info,
+        history=(),
+        status=401,
+        message="unauthorized",
+    )
+    connector = _make_connector()
+    session = MagicMock()
+    session.ws_connect = AsyncMock(side_effect=handshake_exc)
+    connector._aiohttp_session = session  # noqa: SLF001
+
+    with caplog.at_level("ERROR", logger="aioharmony.hubconnector_websocket"):
+        assert await connector.hub_connect() is False
+
+    assert connector._websocket is None  # noqa: SLF001
+    assert any("Invalid status code 401" in r.message for r in caplog.records)
+
+
+@pytest.mark.asyncio
 async def test_hub_connect_success_fires_callback_and_starts_listener() -> None:
     """Successful ws_connect creates the listener task and notifies the connect callback."""
     connect_cb = MagicMock()
