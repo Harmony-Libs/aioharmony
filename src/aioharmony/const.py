@@ -1,6 +1,4 @@
-"""
-Constants used throughout the modules
-"""
+"""Constants used throughout the modules."""
 
 import asyncio
 from collections.abc import Callable

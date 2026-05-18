@@ -121,9 +121,7 @@ async def listen_for_new_activities(client, _):
 
 # Functions for use on command line
 async def show_config(client, _):
-    """
-    Connects to the Harmony and return current configuration.
-    """
+    """Connect to the Harmony and return current configuration."""
     config = client.config
 
     if config:
@@ -134,9 +132,7 @@ async def show_config(client, _):
 
 
 async def show_detailed_config(client, _):
-    """
-    Connects to the Harmony and return current configuration.
-    """
+    """Connect to the Harmony and return current configuration."""
     config = client.hub_config
 
     if config:
@@ -147,9 +143,7 @@ async def show_detailed_config(client, _):
 
 
 async def show_current_activity(client, _):
-    """
-    Returns Harmony hub's current activity.
-    """
+    """Return Harmony hub's current activity."""
     activity_id, activity_name = client.current_activity
 
     if activity_name:
@@ -161,8 +155,7 @@ async def show_current_activity(client, _):
 
 
 async def start_activity(client, args):
-    """
-    Connects to Harmony Hub and starts an activity
+    """Connects to Harmony Hub and starts an activity
 
     Args:
         args (argparse): Argparse object containing required variables from
@@ -193,9 +186,7 @@ async def start_activity(client, args):
 
 
 async def power_off(client, _):
-    """
-    Power off Harmony Hub.
-    """
+    """Power off Harmony Hub."""
     status = await client.power_off()
 
     if status:
@@ -205,8 +196,7 @@ async def power_off(client, _):
 
 
 async def send_command(client, args):
-    """
-    Connects to the Harmony and send a simple command.
+    """Connects to the Harmony and send a simple command.
 
     Args:
         args (argparse): Argparse object containing required variables from
@@ -247,8 +237,7 @@ async def send_command(client, args):
 
 
 async def send_commands(client, args):
-    """
-    Connects to the Harmony and send a series of simple commands.
+    """Connects to the Harmony and send a series of simple commands.
 
     Args:
         args (argparse): Argparse object containing required variables from
@@ -292,8 +281,7 @@ async def send_commands(client, args):
 
 
 async def change_channel(client, args):
-    """
-    Change channel
+    """Change channel
 
     Args:
         args (argparse): Argparse object containing required variables from
@@ -314,8 +302,7 @@ async def change_channel(client, args):
 
 
 async def sync(client, _):
-    """
-    Syncs Harmony hub to web service.
+    """Syncs Harmony hub to web service.
 
     Args:
         args (argparse): Argparse object containing required variables from

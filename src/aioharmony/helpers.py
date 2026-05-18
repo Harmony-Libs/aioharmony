@@ -1,6 +1,4 @@
-"""
-This only contains some helper routines that are used.
-"""
+"""Helper routines used by the package."""
 
 import asyncio
 import logging
@@ -53,8 +51,7 @@ def call_raw_callback(
     callback_uuid: str = None,
     callback_name: str = None,
 ) -> bool:
-    """
-    Executes or sets the callback provided based on the type of callback:
+    """Executes or sets the callback provided based on the type of callback:
       * Future : sets the result of the future to result provided
       * Event : sets the event
       * Coroutine: schedules the coroutine on the loop, result is
@@ -140,8 +137,7 @@ def call_raw_callback(
 def search_dict(
     match_value: object = None, key: str = None, search_list: list[dict] = None
 ) -> dict | None:
-    """
-    Returns the 1st element in a list containing dictionaries
+    """Returns the 1st element in a list containing dictionaries
     where the value of key provided matches the value provided.
 
     :param match_value: value to match upon (search for)

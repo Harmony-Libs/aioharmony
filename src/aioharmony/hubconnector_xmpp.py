@@ -1,8 +1,4 @@
-"""
-Connector class for connecting to send requests and receive
-
-responses.
-"""
+"""Connector class for sending requests and receiving responses."""
 
 import asyncio
 import contextlib
@@ -91,11 +87,7 @@ class HubConnector(slixmpp.ClientXMPP):
         self._callbacks = value
 
     def _register_handlers(self):
-        """
-        Register all the different handlers within XMPP based on
-
-        messages being received and events.
-        """
+        """Register XMPP handlers for incoming messages and events."""
         _LOGGER.debug("%s: Registering internal handlers.", self._ip_address)
         # Register the callback for messages being received
         self._listener()
@@ -122,8 +114,7 @@ class HubConnector(slixmpp.ClientXMPP):
         self.remove_handler("listener")
 
     async def close(self):
-        """
-        Close all connections and tasks
+        """Close all connections and tasks
 
         This should be called to ensure everything is stopped and
         cancelled out.

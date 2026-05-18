@@ -318,7 +318,7 @@ async def test_reconnect_does_not_clobber_connected_flag() -> None:
 
 @pytest.mark.asyncio
 async def test_callbacks_property_roundtrip() -> None:
-    """callbacks getter/setter is a simple pass-through."""
+    """Callbacks getter/setter is a simple pass-through."""
     connector = _make_connector()
     new_cb = ConnectorCallbackType(connect=AsyncMock(), disconnect=AsyncMock())
 
