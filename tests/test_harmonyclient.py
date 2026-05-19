@@ -15,6 +15,7 @@ from aioharmony.const import (
     WEBSOCKETS,
     XMPP,
     ClientCallbackType,
+    ConnectorCallbackType,
 )
 from aioharmony.harmonyclient import HarmonyClient
 
@@ -428,3 +429,651 @@ async def test_disconnect_converts_timeout_to_aiotimeout(
 
     with pytest.raises(aioexc.TimeOut):
         await client.disconnect()
+
+
+# ---------------------------------------------------------------------------
+# send_to_hub
+# ---------------------------------------------------------------------------
+
+
+async def test_send_to_hub_default_params_dispatches_get_request(
+    client: HarmonyClient,
+) -> None:
+    """Default params populate verb=get/format=json and hub_send is awaited."""
+    client._hub_connection = MagicMock()  # noqa: SLF001
+    client._hub_connection.hub_send = AsyncMock(return_value=True)  # noqa: SLF001
+
+    result = await client.send_to_hub(command="get_config", wait=False)
+
+    assert result is True
+    call_kwargs = client._hub_connection.hub_send.await_args.kwargs  # noqa: SLF001
+    assert call_kwargs["params"] == {"verb": "get", "format": "json"}
+    assert "config" in call_kwargs["command"]
+
+
+async def test_send_to_hub_wait_false_returns_true_when_send_not_future(
+    client: HarmonyClient,
+) -> None:
+    client._hub_connection = MagicMock()  # noqa: SLF001
+    client._hub_connection.hub_send = AsyncMock(return_value="ok")  # noqa: SLF001
+
+    result = await client.send_to_hub(command="get_config", wait=False)
+
+    assert result is True
+
+
+async def test_send_to_hub_returns_false_and_unregisters_when_send_returns_none(
+    client: HarmonyClient,
+) -> None:
+    """send_response is None → returns False and any registered handler is dropped."""
+    client._hub_connection = MagicMock()  # noqa: SLF001
+    client._hub_connection.hub_send = AsyncMock(return_value=None)  # noqa: SLF001
+
+    result = await client.send_to_hub(command="get_config")
+
+    assert result is False
+    # The wait=True path registered a handler that should now be gone.
+    assert client._callback_handler._handler_list  # noqa: SLF001
+    # Only the 4 core handlers from __init__ remain (no orphan send handler).
+    assert len(client._callback_handler._handler_list) == 4  # noqa: SLF001
+
+
+async def test_send_to_hub_uses_send_future_when_returned(
+    client: HarmonyClient,
+) -> None:
+    """If hub_send returns a future, that future's result becomes the response."""
+    fut = asyncio.get_running_loop().create_future()
+    fut.set_result({"data": {"foo": "bar"}})
+    client._hub_connection = MagicMock()  # noqa: SLF001
+    client._hub_connection.hub_send = AsyncMock(return_value=fut)  # noqa: SLF001
+
+    result = await client.send_to_hub(command="get_config")
+
+    assert result == {"data": {"foo": "bar"}}
+
+
+async def test_send_to_hub_timeout_on_hub_send_raises_timeout(
+    client: HarmonyClient,
+) -> None:
+    client._hub_connection = MagicMock()  # noqa: SLF001
+    client._hub_connection.hub_send = AsyncMock(  # noqa: SLF001
+        side_effect=asyncio.TimeoutError
+    )
+
+    with pytest.raises(aioexc.TimeOut):
+        await client.send_to_hub(command="get_config")
+
+    # Send handler was cleaned up.
+    assert len(client._callback_handler._handler_list) == 4  # noqa: SLF001
+
+
+async def test_send_to_hub_post_flag_propagates(client: HarmonyClient) -> None:
+    client._hub_connection = MagicMock()  # noqa: SLF001
+    client._hub_connection.hub_send = AsyncMock(return_value=True)  # noqa: SLF001
+
+    await client.send_to_hub(command="provision_info", post=True, wait=False)
+
+    assert client._hub_connection.hub_send.await_args.kwargs["post"] is True  # noqa: SLF001
+
+
+# ---------------------------------------------------------------------------
+# _get_config
+# ---------------------------------------------------------------------------
+
+
+def _config_response_ok() -> dict:
+    return {
+        "code": 200,
+        "data": {
+            "activity": [{"id": "1", "label": "Watch TV"}],
+            "device": [{"id": "100", "label": "TV"}],
+        },
+    }
+
+
+async def test_get_config_success_populates_activities_and_devices(
+    client: HarmonyClient,
+) -> None:
+    with patch.object(
+        client, "send_to_hub", AsyncMock(return_value=_config_response_ok())
+    ):
+        result = await client._get_config()  # noqa: SLF001
+
+    assert result == _config_response_ok()["data"]
+    assert client.hub_config.activities == [
+        {"id": 1, "name": "Watch TV", "name_lowercase": "watch tv"}
+    ]
+    assert client.hub_config.devices == [
+        {"id": 100, "name": "TV", "name_lowercase": "tv"}
+    ]
+
+
+async def test_get_config_returns_none_when_response_empty(
+    client: HarmonyClient,
+) -> None:
+    with patch.object(client, "send_to_hub", AsyncMock(return_value=None)):
+        result = await client._get_config()  # noqa: SLF001
+
+    assert result is None
+
+
+async def test_get_config_returns_none_when_code_not_200(
+    client: HarmonyClient,
+) -> None:
+    with patch.object(
+        client, "send_to_hub", AsyncMock(return_value={"code": 500, "data": {}})
+    ):
+        result = await client._get_config()  # noqa: SLF001
+
+    assert result is None
+
+
+async def test_get_config_retries_once_on_timeout(client: HarmonyClient) -> None:
+    send = AsyncMock(side_effect=[aioexc.TimeOut, _config_response_ok()])
+    with patch.object(client, "send_to_hub", send):
+        result = await client._get_config()  # noqa: SLF001
+
+    assert result == _config_response_ok()["data"]
+    assert send.await_count == 2
+
+
+async def test_get_config_raises_timeout_after_second_failure(
+    client: HarmonyClient,
+) -> None:
+    send = AsyncMock(side_effect=[aioexc.TimeOut, aioexc.TimeOut])
+    with patch.object(client, "send_to_hub", send), pytest.raises(aioexc.TimeOut):
+        await client._get_config()  # noqa: SLF001
+
+
+# ---------------------------------------------------------------------------
+# _retrieve_provision_info / _retrieve_discovery_info / _retrieve_hub_info
+# ---------------------------------------------------------------------------
+
+
+async def test_retrieve_provision_info_success_updates_info(
+    client: HarmonyClient,
+) -> None:
+    response = {"code": 200, "data": {"activeRemoteId": "abc"}}
+    with patch.object(client, "send_to_hub", AsyncMock(return_value=response)):
+        result = await client._retrieve_provision_info()  # noqa: SLF001
+
+    assert result == {"activeRemoteId": "abc"}
+    assert client.hub_config.info == {"activeRemoteId": "abc"}
+
+
+async def test_retrieve_provision_info_accepts_string_code_200(
+    client: HarmonyClient,
+) -> None:
+    response = {"code": "200", "data": {"activeRemoteId": "abc"}}
+    with patch.object(client, "send_to_hub", AsyncMock(return_value=response)):
+        result = await client._retrieve_provision_info()  # noqa: SLF001
+
+    assert result == {"activeRemoteId": "abc"}
+
+
+async def test_retrieve_provision_info_non_200_does_not_update(
+    client: HarmonyClient,
+) -> None:
+    with patch.object(
+        client, "send_to_hub", AsyncMock(return_value={"code": 500, "data": {"x": 1}})
+    ):
+        result = await client._retrieve_provision_info()  # noqa: SLF001
+
+    assert result is None
+    assert client.hub_config.info == {}
+
+
+async def test_retrieve_provision_info_both_timeouts_returns_none(
+    client: HarmonyClient,
+) -> None:
+    send = AsyncMock(side_effect=[aioexc.TimeOut, aioexc.TimeOut])
+    with patch.object(client, "send_to_hub", send):
+        result = await client._retrieve_provision_info()  # noqa: SLF001
+
+    assert result is None
+    assert send.await_count == 2
+
+
+async def test_retrieve_provision_info_retries_after_first_timeout(
+    client: HarmonyClient,
+) -> None:
+    response = {"code": 200, "data": {"activeRemoteId": "abc"}}
+    send = AsyncMock(side_effect=[aioexc.TimeOut, response])
+    with patch.object(client, "send_to_hub", send):
+        result = await client._retrieve_provision_info()  # noqa: SLF001
+
+    assert result == {"activeRemoteId": "abc"}
+    assert send.await_count == 2
+
+
+async def test_retrieve_discovery_info_success_updates_discover_info(
+    client: HarmonyClient,
+) -> None:
+    response = {"code": 200, "data": {"friendlyName": "Den"}}
+    with patch.object(client, "send_to_hub", AsyncMock(return_value=response)):
+        await client._retrieve_discovery_info()  # noqa: SLF001
+
+    assert client.hub_config.discover_info == {"friendlyName": "Den"}
+
+
+async def test_retrieve_discovery_info_non_200_does_not_update(
+    client: HarmonyClient,
+) -> None:
+    with patch.object(
+        client, "send_to_hub", AsyncMock(return_value={"code": 500, "data": {}})
+    ):
+        await client._retrieve_discovery_info()  # noqa: SLF001
+
+    assert client.hub_config.discover_info == {}
+
+
+async def test_retrieve_discovery_info_both_timeouts_silently_returns(
+    client: HarmonyClient,
+) -> None:
+    send = AsyncMock(side_effect=[aioexc.TimeOut, aioexc.TimeOut])
+    with patch.object(client, "send_to_hub", send):
+        await client._retrieve_discovery_info()  # noqa: SLF001
+
+    assert client.hub_config.discover_info == {}
+    assert send.await_count == 2
+
+
+async def test_retrieve_hub_info_returns_provision_result(
+    client: HarmonyClient,
+) -> None:
+    with (
+        patch.object(
+            client,
+            "_retrieve_provision_info",
+            AsyncMock(return_value={"activeRemoteId": "abc"}),
+        ),
+        patch.object(client, "_retrieve_discovery_info", AsyncMock(return_value=None)),
+    ):
+        result = await client._retrieve_hub_info()  # noqa: SLF001
+
+    assert result == {"activeRemoteId": "abc"}
+
+
+async def test_retrieve_hub_info_reraises_exception_from_children(
+    client: HarmonyClient,
+) -> None:
+    class _BoomError(RuntimeError):
+        pass
+
+    with (
+        patch.object(
+            client, "_retrieve_provision_info", AsyncMock(side_effect=_BoomError())
+        ),
+        patch.object(client, "_retrieve_discovery_info", AsyncMock(return_value=None)),
+        pytest.raises(_BoomError),
+    ):
+        await client._retrieve_hub_info()  # noqa: SLF001
+
+
+# ---------------------------------------------------------------------------
+# _get_current_activity
+# ---------------------------------------------------------------------------
+
+
+async def test_get_current_activity_success_sets_id_and_fires_callback(
+    populated_client: HarmonyClient,
+) -> None:
+    cb = MagicMock()
+    populated_client._callbacks = populated_client._callbacks._replace(  # noqa: SLF001
+        new_activity=cb
+    )
+    response = {"code": 200, "data": {"result": "1"}}
+    with (
+        patch.object(populated_client, "send_to_hub", AsyncMock(return_value=response)),
+        patch("aioharmony.harmonyclient.call_callback") as mock_call,
+    ):
+        ok = await populated_client._get_current_activity()  # noqa: SLF001
+
+    assert ok is True
+    assert populated_client.current_activity_id == 1
+    mock_call.assert_called_once()
+    assert mock_call.call_args.kwargs["callback_handler"] is cb
+
+
+async def test_get_current_activity_no_callback_when_none(
+    populated_client: HarmonyClient,
+) -> None:
+    response = {"code": 200, "data": {"result": "1"}}
+    with (
+        patch.object(populated_client, "send_to_hub", AsyncMock(return_value=response)),
+        patch("aioharmony.harmonyclient.call_callback") as mock_call,
+    ):
+        ok = await populated_client._get_current_activity()  # noqa: SLF001
+
+    assert ok is True
+    assert populated_client.current_activity_id == 1
+    mock_call.assert_not_called()
+
+
+async def test_get_current_activity_returns_false_when_response_empty(
+    client: HarmonyClient,
+) -> None:
+    with patch.object(client, "send_to_hub", AsyncMock(return_value=None)):
+        ok = await client._get_current_activity()  # noqa: SLF001
+    assert ok is False
+
+
+async def test_get_current_activity_returns_false_when_code_not_200(
+    client: HarmonyClient,
+) -> None:
+    with patch.object(
+        client,
+        "send_to_hub",
+        AsyncMock(return_value={"code": 500, "data": {"result": "1"}}),
+    ):
+        ok = await client._get_current_activity()  # noqa: SLF001
+    assert ok is False
+
+
+async def test_get_current_activity_both_timeouts_returns_false(
+    client: HarmonyClient,
+) -> None:
+    send = AsyncMock(side_effect=[aioexc.TimeOut, aioexc.TimeOut])
+    with patch.object(client, "send_to_hub", send):
+        ok = await client._get_current_activity()  # noqa: SLF001
+    assert ok is False
+    assert send.await_count == 2
+
+
+# ---------------------------------------------------------------------------
+# _notification_callback
+# ---------------------------------------------------------------------------
+
+
+async def test_notification_callback_noop_when_data_missing(
+    client: HarmonyClient,
+) -> None:
+    with patch.object(client, "refresh_info_from_hub", AsyncMock()) as refresh:
+        await client._notification_callback({})  # noqa: SLF001
+    refresh.assert_not_awaited()
+
+
+async def test_notification_callback_noop_when_sync_in_progress(
+    client: HarmonyClient,
+) -> None:
+    message = {"data": {"configVersion": 99, "syncStatus": 1}}
+    with patch.object(client, "refresh_info_from_hub", AsyncMock()) as refresh:
+        await client._notification_callback(message)  # noqa: SLF001
+    refresh.assert_not_awaited()
+
+
+async def test_notification_callback_noop_when_version_unchanged(
+    client: HarmonyClient,
+) -> None:
+    client._hub_config = client._hub_config._replace(config_version=7)  # noqa: SLF001
+    message = {"data": {"configVersion": 7, "syncStatus": 2}}
+    with patch.object(client, "refresh_info_from_hub", AsyncMock()) as refresh:
+        await client._notification_callback(message)  # noqa: SLF001
+    refresh.assert_not_awaited()
+
+
+async def test_notification_callback_refreshes_on_version_change(
+    client: HarmonyClient,
+) -> None:
+    client._hub_config = client._hub_config._replace(config_version=7)  # noqa: SLF001
+    message = {"data": {"configVersion": 8, "syncStatus": 2}}
+    with patch.object(client, "refresh_info_from_hub", AsyncMock()) as refresh:
+        await client._notification_callback(message)  # noqa: SLF001
+    refresh.assert_awaited_once()
+    assert client.hub_config.config_version == 8
+
+
+# ---------------------------------------------------------------------------
+# _update_activity_callback
+# ---------------------------------------------------------------------------
+
+
+async def test_update_activity_callback_falls_back_to_get_current(
+    client: HarmonyClient,
+) -> None:
+    """A message with no activityId triggers a fresh fetch."""
+    with patch.object(
+        client, "_get_current_activity", AsyncMock(return_value=True)
+    ) as gca:
+        await client._update_activity_callback({"data": None})  # noqa: SLF001
+    gca.assert_awaited_once()
+
+
+async def test_update_activity_callback_sets_id_and_fires_callback(
+    populated_client: HarmonyClient,
+) -> None:
+    cb = MagicMock()
+    populated_client._callbacks = populated_client._callbacks._replace(  # noqa: SLF001
+        new_activity=cb
+    )
+    with patch("aioharmony.harmonyclient.call_callback") as mock_call:
+        await populated_client._update_activity_callback(  # noqa: SLF001
+            {"data": {"activityId": "2"}}
+        )
+
+    assert populated_client.current_activity_id == 2
+    mock_call.assert_called_once()
+    assert mock_call.call_args.kwargs["callback_handler"] is cb
+
+
+# ---------------------------------------------------------------------------
+# _update_start_activity_callback
+# ---------------------------------------------------------------------------
+
+
+async def test_update_start_activity_callback_power_off_to_power_off_is_noop(
+    client: HarmonyClient,
+) -> None:
+    client._current_activity_id = -1  # noqa: SLF001
+    cb = MagicMock()
+    client._callbacks = client._callbacks._replace(new_activity_starting=cb)  # noqa: SLF001
+    with patch("aioharmony.harmonyclient.call_callback") as mock_call:
+        await client._update_start_activity_callback(  # noqa: SLF001
+            {"data": {"activityStatus": 0, "activityId": "-1"}}
+        )
+
+    assert client.current_activity_id == -1
+    mock_call.assert_not_called()
+
+
+async def test_update_start_activity_callback_power_off_from_active(
+    populated_client: HarmonyClient,
+) -> None:
+    populated_client._current_activity_id = 1  # noqa: SLF001
+    cb = MagicMock()
+    populated_client._callbacks = populated_client._callbacks._replace(  # noqa: SLF001
+        new_activity_starting=cb
+    )
+    with patch("aioharmony.harmonyclient.call_callback") as mock_call:
+        await populated_client._update_start_activity_callback(  # noqa: SLF001
+            {"data": {"activityStatus": 0, "activityId": "-1"}}
+        )
+
+    assert populated_client.current_activity_id == -1
+    mock_call.assert_called_once()
+
+
+async def test_update_start_activity_callback_starting_activity(
+    populated_client: HarmonyClient,
+) -> None:
+    cb = MagicMock()
+    populated_client._callbacks = populated_client._callbacks._replace(  # noqa: SLF001
+        new_activity_starting=cb
+    )
+    with patch("aioharmony.harmonyclient.call_callback") as mock_call:
+        await populated_client._update_start_activity_callback(  # noqa: SLF001
+            {"data": {"activityStatus": 2, "activityId": "1"}}
+        )
+
+    assert populated_client.current_activity_id == 1
+    mock_call.assert_called_once()
+
+
+async def test_update_start_activity_callback_no_data_clears_id(
+    populated_client: HarmonyClient,
+) -> None:
+    populated_client._current_activity_id = 1  # noqa: SLF001
+    with patch("aioharmony.harmonyclient.call_callback"):
+        await populated_client._update_start_activity_callback({"data": None})  # noqa: SLF001
+
+    assert populated_client.current_activity_id is None
+
+
+# ---------------------------------------------------------------------------
+# refresh_info_from_hub
+# ---------------------------------------------------------------------------
+
+
+async def test_refresh_info_from_hub_happy_path_fires_callback(
+    client: HarmonyClient,
+) -> None:
+    cb = MagicMock()
+    client._callbacks = client._callbacks._replace(config_updated=cb)  # noqa: SLF001
+    with (
+        patch.object(client, "_get_config", AsyncMock(return_value={"x": 1})),
+        patch.object(client, "_retrieve_hub_info", AsyncMock(return_value={})),
+        patch.object(client, "_get_current_activity", AsyncMock(return_value=True)),
+        patch("aioharmony.harmonyclient.call_callback") as mock_call,
+    ):
+        await client.refresh_info_from_hub()
+
+    mock_call.assert_called_once()
+    assert mock_call.call_args.kwargs["callback_handler"] is cb
+
+
+async def test_refresh_info_from_hub_no_callback_when_unset(
+    client: HarmonyClient,
+) -> None:
+    with (
+        patch.object(client, "_get_config", AsyncMock(return_value={})),
+        patch.object(client, "_retrieve_hub_info", AsyncMock(return_value={})),
+        patch.object(client, "_get_current_activity", AsyncMock(return_value=True)),
+        patch("aioharmony.harmonyclient.call_callback") as mock_call,
+    ):
+        await client.refresh_info_from_hub()
+
+    mock_call.assert_not_called()
+
+
+async def test_refresh_info_from_hub_timeout_result_short_circuits(
+    client: HarmonyClient,
+) -> None:
+    """A TimeOut from _get_config bails before _get_current_activity is called."""
+    with (
+        patch.object(client, "_get_config", AsyncMock(side_effect=aioexc.TimeOut)),
+        patch.object(client, "_retrieve_hub_info", AsyncMock(return_value={})),
+        patch.object(client, "_get_current_activity", AsyncMock()) as gca,
+    ):
+        await client.refresh_info_from_hub()
+
+    gca.assert_not_awaited()
+
+
+async def test_refresh_info_from_hub_other_exception_raises(
+    client: HarmonyClient,
+) -> None:
+    class _BoomError(RuntimeError):
+        pass
+
+    with (
+        patch.object(client, "_get_config", AsyncMock(side_effect=_BoomError())),
+        patch.object(client, "_retrieve_hub_info", AsyncMock(return_value={})),
+        pytest.raises(_BoomError),
+    ):
+        await client.refresh_info_from_hub()
+
+
+# ---------------------------------------------------------------------------
+# connect (orchestrator)
+# ---------------------------------------------------------------------------
+
+
+async def test_connect_returns_false_when_transport_probe_fails(
+    client: HarmonyClient,
+) -> None:
+    with patch.object(client, "_websocket_or_xmpp", AsyncMock(return_value=False)):
+        result = await client.connect()
+    assert result is False
+
+
+async def test_connect_returns_false_when_hub_connect_returns_false(
+    client: HarmonyClient,
+) -> None:
+    client._hub_connection = MagicMock()  # noqa: SLF001
+    client._hub_connection.hub_connect = AsyncMock(return_value=False)  # noqa: SLF001
+    result = await client.connect()
+    assert result is False
+
+
+async def test_connect_converts_hub_connect_timeout_to_aiotimeout(
+    client: HarmonyClient,
+) -> None:
+    client._hub_connection = MagicMock()  # noqa: SLF001
+    client._hub_connection.hub_connect = AsyncMock(  # noqa: SLF001
+        side_effect=asyncio.TimeoutError
+    )
+    with pytest.raises(aioexc.TimeOut):
+        await client.connect()
+
+
+async def test_connect_populates_hub_state_and_fires_connect_callback(
+    client: HarmonyClient,
+) -> None:
+    cb = MagicMock()
+    client._callbacks = client._callbacks._replace(connect=cb)  # noqa: SLF001
+    client._hub_connection = MagicMock()  # noqa: SLF001
+    client._hub_connection.hub_connect = AsyncMock(return_value=True)  # noqa: SLF001
+    client._hub_connection.callbacks = ConnectorCallbackType(None, None)  # noqa: SLF001
+
+    state_response = {"data": {"configVersion": 42, "extra": "x"}}
+    with (
+        patch.object(client, "send_to_hub", AsyncMock(return_value=state_response)),
+        patch.object(client, "refresh_info_from_hub", AsyncMock()),
+        patch("aioharmony.harmonyclient.call_callback") as mock_call,
+    ):
+        result = await client.connect()
+
+    assert result is True
+    assert client.hub_config.config_version == 42
+    assert client.hub_config.hub_state == state_response["data"]
+    mock_call.assert_called_once()
+    assert mock_call.call_args.kwargs["callback_handler"] is cb
+    # Connector callbacks were refreshed with the user-provided pair.
+    assert client._hub_connection.callbacks.connect is cb  # noqa: SLF001
+
+
+async def test_connect_handles_get_current_state_timeout(
+    client: HarmonyClient,
+) -> None:
+    """A TimeOut from get_current_state is logged but doesn't fail the connect."""
+    client._hub_connection = MagicMock()  # noqa: SLF001
+    client._hub_connection.hub_connect = AsyncMock(return_value=True)  # noqa: SLF001
+    client._hub_connection.callbacks = ConnectorCallbackType(None, None)  # noqa: SLF001
+
+    with (
+        patch.object(client, "send_to_hub", AsyncMock(side_effect=aioexc.TimeOut)),
+        patch.object(client, "refresh_info_from_hub", AsyncMock()),
+    ):
+        result = await client.connect()
+
+    assert result is True
+    # config_version was NOT updated since the response never arrived.
+    assert client.hub_config.config_version is None
+
+
+async def test_connect_reraises_unexpected_exception_from_send(
+    client: HarmonyClient,
+) -> None:
+    class _BoomError(RuntimeError):
+        pass
+
+    client._hub_connection = MagicMock()  # noqa: SLF001
+    client._hub_connection.hub_connect = AsyncMock(return_value=True)  # noqa: SLF001
+    client._hub_connection.callbacks = ConnectorCallbackType(None, None)  # noqa: SLF001
+
+    with (
+        patch.object(client, "send_to_hub", AsyncMock(side_effect=_BoomError())),
+        patch.object(client, "refresh_info_from_hub", AsyncMock()),
+        pytest.raises(_BoomError),
+    ):
+        await client.connect()
