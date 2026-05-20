@@ -34,8 +34,130 @@ Status
 * Changing channels
 * Custom callbacks.
 
-Usage
------
+Installation
+------------
+
+.. code:: bash
+
+    pip install aioharmony
+
+Python API usage
+----------------
+
+``aioharmony`` is an ``asyncio`` library, so every method that talks to the
+Hub is a coroutine and must be ``await``-ed from inside an event loop.
+The public entry point is the ``HarmonyAPI`` class.
+
+Connecting to a Hub
+~~~~~~~~~~~~~~~~~~~
+
+.. code:: python
+
+    import asyncio
+
+    from aioharmony.harmonyapi import HarmonyAPI
+
+
+    async def main() -> None:
+        client = HarmonyAPI(ip_address="192.168.1.203", protocol="WEBSOCKETS")
+        await client.connect()
+        try:
+            print(f"Connected to {client.name} (firmware {client.fw_version})")
+        finally:
+            await client.close()
+
+
+    asyncio.run(main())
+
+``protocol`` accepts ``"WEBSOCKETS"`` (default for modern firmware) or
+``"XMPP"`` (legacy hubs that still have XMPP enabled). Always pair
+``connect()`` with ``close()`` — typically inside a ``try``/``finally`` —
+so the background reconnect loop and the WebSocket session shut down
+cleanly.
+
+Starting an activity
+~~~~~~~~~~~~~~~~~~~~
+
+``start_activity()`` takes an activity ID, not a name. Use
+``get_activity_id()`` to look the ID up:
+
+.. code:: python
+
+    async def start_watch_tv(client: HarmonyAPI) -> None:
+        activity_id = client.get_activity_id("Watch TV")
+        if activity_id is None:
+            raise ValueError("Activity 'Watch TV' is not configured on this hub")
+        success, message = await client.start_activity(activity_id)
+        if not success:
+            raise RuntimeError(f"Failed to start activity: {message}")
+
+Showing the current activity / powering off
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. code:: python
+
+    async def show_and_power_off(client: HarmonyAPI) -> None:
+        activity_id, activity_name = client.current_activity
+        print(f"Current activity: {activity_name} ({activity_id})")
+        await client.power_off()
+
+Sending a device command
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+``send_commands()`` takes a ``SendCommandDevice`` (or a list of them,
+optionally interleaved with ``float`` delays in seconds). ``device`` is
+the device ID — look it up with ``get_device_id()``:
+
+.. code:: python
+
+    from aioharmony.const import SendCommandDevice
+
+
+    async def volume_up(client: HarmonyAPI, device_name: str) -> None:
+        device_id = client.get_device_id(device_name)
+        if device_id is None:
+            raise ValueError(f"Device {device_name!r} not found")
+        command = SendCommandDevice(device=device_id, command="VolumeUp", delay=0.2)
+        # send_commands returns an empty list on success, or a list of
+        # SendCommandResponse entries describing the failures.
+        errors = await client.send_commands(command)
+        for err in errors:
+            print(f"{err.command.command} failed: {err.msg} (code {err.code})")
+
+Reacting to hub events with callbacks
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+``ClientCallbackType`` is a ``NamedTuple`` with five slots
+(``connect``, ``disconnect``, ``new_activity_starting``,
+``new_activity``, ``config_updated``). Each slot accepts a plain
+callable, an ``asyncio.Future``, an ``asyncio.Event``, or ``None``:
+
+.. code:: python
+
+    from aioharmony.const import ClientCallbackType
+
+
+    def on_new_activity(info: tuple[int, str]) -> None:
+        activity_id, activity_name = info
+        print(f"Now running: {activity_name} ({activity_id})")
+
+
+    callbacks = ClientCallbackType(
+        connect=None,
+        disconnect=None,
+        new_activity_starting=None,
+        new_activity=on_new_activity,
+        config_updated=None,
+    )
+    client = HarmonyAPI(
+        ip_address="192.168.1.203", protocol="WEBSOCKETS", callbacks=callbacks
+    )
+
+See the ``examples/`` directory in the source tree for runnable
+versions of each snippet above.
+
+Command-line usage
+------------------
 
 .. code:: bash
 
