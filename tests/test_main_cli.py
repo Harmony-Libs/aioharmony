@@ -586,9 +586,10 @@ def test_main_handles_keyboard_interrupt(
 def test_cancel_tasks_cancels_pending() -> None:
     loop = asyncio.new_event_loop()
     try:
+        never: asyncio.Future[None] = loop.create_future()
 
         async def long_running() -> None:
-            await asyncio.sleep(60)
+            await never
 
         task = loop.create_task(long_running())
         with patch.object(cli.asyncio, "sleep", new=AsyncMock(return_value=None)):
