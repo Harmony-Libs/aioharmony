@@ -349,9 +349,7 @@ async def test_send_command_invalid_device(
 ) -> None:
     mock_client.get_device_id.return_value = None
     mock_client.get_device_name.return_value = None
-    await cli.send_command(
-        mock_client, _make_args(device_id="ghost", command="Play")
-    )
+    await cli.send_command(mock_client, _make_args(device_id="ghost", command="Play"))
     assert "is invalid" in capsys.readouterr().out
     mock_client.send_commands.assert_not_called()
 
@@ -400,9 +398,7 @@ async def test_send_commands_invalid_device(
 ) -> None:
     mock_client.get_device_id.return_value = None
     mock_client.get_device_name.return_value = None
-    await cli.send_commands(
-        mock_client, _make_args(device_id="ghost", commands="Play")
-    )
+    await cli.send_commands(mock_client, _make_args(device_id="ghost", commands="Play"))
     assert "is invalid" in capsys.readouterr().out
 
 
@@ -412,9 +408,7 @@ async def test_send_commands_reports_failures(
     result = MagicMock(code="500", msg="bad")
     result.command = MagicMock(command="Play", device="dev42")
     mock_client.send_commands = AsyncMock(return_value=[result])
-    await cli.send_commands(
-        mock_client, _make_args(device_id="TV", commands="Play")
-    )
+    await cli.send_commands(mock_client, _make_args(device_id="TV", commands="Play"))
     assert "failed with code 500" in capsys.readouterr().out
 
 
