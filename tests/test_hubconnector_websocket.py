@@ -9,6 +9,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import aiohttp
 import pytest
+from multidict import CIMultiDict
+from yarl import URL
 
 from aioharmony.const import ConnectorCallbackType
 from aioharmony.hubconnector_websocket import HubConnector
@@ -486,9 +488,6 @@ async def test_hub_connect_handles_handshake_error_with_status(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     """WSServerHandshakeError is logged with its status, not as a generic ClientError."""
-    from multidict import CIMultiDict
-    from yarl import URL
-
     request_info = aiohttp.RequestInfo(
         url=URL("http://10.0.0.1:8088/"),
         method="GET",
