@@ -1366,7 +1366,7 @@ async def test_start_activity_returns_failure_when_send_returns_falsy(
     client: HarmonyClient,
 ) -> None:
     """start_activity aborts immediately instead of hanging when the hub send fails."""
-    with patch.object(client, "send_to_hub", AsyncMock(return_value=None)):
+    with patch.object(client, "send_to_hub", AsyncMock(return_value=False)):
         result = await asyncio.wait_for(client.start_activity(1), timeout=1)
     assert result == (False, None)
 
