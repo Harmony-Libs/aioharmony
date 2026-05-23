@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 import pytest_asyncio
+from async_timeout import timeout as real_timeout
 
 import aioharmony.exceptions as aioexc
 from aioharmony.const import (
@@ -16,6 +17,7 @@ from aioharmony.const import (
     XMPP,
     ClientCallbackType,
     ConnectorCallbackType,
+    SendCommandDevice,
 )
 from aioharmony.harmonyclient import HarmonyClient
 
@@ -1077,3 +1079,279 @@ async def test_connect_reraises_unexpected_exception_from_send(
         pytest.raises(_BoomError),
     ):
         await client.connect()
+
+
+# ---------------------------------------------------------------------------
+# start_activity
+# ---------------------------------------------------------------------------
+
+
+def _capture_activity_handlers(client: HarmonyClient) -> list:
+    """Patch register/unregister, returning the callback closures in
+    registration order: started, in_progress, helpdiscretes, completed.
+    """
+    captured: list = []
+
+    def fake_register(handler: Any, msgid: str) -> str:
+        captured.append(handler.handler_obj)
+        return f"uuid-{len(captured)}"
+
+    client.register_handler = MagicMock(side_effect=fake_register)
+    client.unregister_handler = MagicMock(return_value=True)
+    return captured
+
+
+async def test_start_activity_succeeds_on_completion_code_200(
+    populated_client: HarmonyClient,
+) -> None:
+    """A completion message with code 200 resolves to (True, msg)."""
+    client = populated_client
+    handlers = _capture_activity_handlers(client)
+
+    async def fake_send(**_: Any) -> bool:
+        client._loop.call_soon(handlers[3], {"code": 200, "msg": "started"})  # noqa: SLF001
+        return True
+
+    with patch.object(client, "send_to_hub", fake_send):
+        result = await client.start_activity(1)
+
+    assert result == (True, "started")
+    client.unregister_handler.assert_called()
+
+
+async def test_start_activity_fails_when_run_activity_returns_error_code(
+    populated_client: HarmonyClient,
+) -> None:
+    """A RunActivity code outside {100, 200} resolves to (False, msg)."""
+    client = populated_client
+    handlers = _capture_activity_handlers(client)
+
+    async def fake_send(**_: Any) -> bool:
+        client._loop.call_soon(handlers[0], {"code": 500, "msg": "boom"})  # noqa: SLF001
+        return True
+
+    with patch.object(client, "send_to_hub", fake_send):
+        result = await client.start_activity(1)
+
+    assert result == (False, "boom")
+
+
+async def test_start_activity_fails_on_completion_error_code(
+    populated_client: HarmonyClient,
+) -> None:
+    """A completion message with a non-100/200 code resolves to (False, msg)."""
+    client = populated_client
+    handlers = _capture_activity_handlers(client)
+
+    async def fake_send(**_: Any) -> bool:
+        client._loop.call_soon(handlers[3], {"code": 500, "msg": "nope"})  # noqa: SLF001
+        return True
+
+    with patch.object(client, "send_to_hub", fake_send):
+        result = await client.start_activity(1)
+
+    assert result == (False, "nope")
+
+
+async def test_start_activity_ignores_progress_and_in_progress_completion(
+    populated_client: HarmonyClient,
+) -> None:
+    """Progress messages and a code-100 completion don't set a result; the
+    final code-200 completion does.
+    """
+    client = populated_client
+    handlers = _capture_activity_handlers(client)
+
+    async def fake_send(**_: Any) -> bool:
+        client._loop.call_soon(handlers[1], {"data": {"done": 1, "total": 3}})  # noqa: SLF001
+        client._loop.call_soon(handlers[2], {"data": None})  # noqa: SLF001
+        client._loop.call_soon(handlers[3], {"code": 100})  # noqa: SLF001
+        client._loop.call_soon(handlers[3], {"code": 200, "msg": "done"})  # noqa: SLF001
+        return True
+
+    with patch.object(client, "send_to_hub", fake_send):
+        result = await client.start_activity(1)
+
+    assert result == (True, "done")
+
+
+async def test_start_activity_keeps_first_result_when_set_twice(
+    populated_client: HarmonyClient,
+) -> None:
+    """Once a result is set, a later message can't overwrite it."""
+    client = populated_client
+    handlers = _capture_activity_handlers(client)
+
+    async def fake_send(**_: Any) -> bool:
+        client._loop.call_soon(handlers[3], {"code": 200, "msg": "first"})  # noqa: SLF001
+        client._loop.call_soon(handlers[3], {"code": 500, "msg": "second"})  # noqa: SLF001
+        return True
+
+    with patch.object(client, "send_to_hub", fake_send):
+        result = await client.start_activity(1)
+
+    assert result == (True, "first")
+
+
+async def test_start_activity_raises_timeout_when_never_completed(
+    populated_client: HarmonyClient,
+) -> None:
+    """No completion message within the deadline raises TimeOut."""
+    client = populated_client
+    _capture_activity_handlers(client)
+
+    with (
+        patch("aioharmony.harmonyclient.timeout", lambda _t: real_timeout(0)),
+        patch.object(client, "send_to_hub", AsyncMock(return_value=True)),
+        pytest.raises(aioexc.TimeOut),
+    ):
+        await client.start_activity(1)
+
+    client.unregister_handler.assert_called()
+
+
+# ---------------------------------------------------------------------------
+# send_commands
+# ---------------------------------------------------------------------------
+
+
+async def test_send_commands_returns_empty_when_all_succeed(
+    populated_client: HarmonyClient,
+) -> None:
+    """A 200 response is treated as success and produces no error entries; a
+    bare sleep value in the list is honoured without a future.
+    """
+    client = populated_client
+    cmd = SendCommandDevice(device=100, command="PowerOn", delay=0)
+
+    def fake_send_command(command: Any, callback_handler: Any) -> tuple[str, str]:
+        callback_handler.handler_obj.set_result(
+            {"id": "press-1", "code": 200, "msg": "ok"}
+        )
+        return "press-1", "release-1"
+
+    with patch.object(
+        client, "_send_command", AsyncMock(side_effect=fake_send_command)
+    ):
+        result = await client.send_commands([0, cmd])
+
+    assert result == []
+
+
+async def test_send_commands_collects_error_response(
+    populated_client: HarmonyClient,
+) -> None:
+    """A non-200 response is surfaced as a SendCommandResponse."""
+    client = populated_client
+    cmd = SendCommandDevice(device=100, command="PowerOn", delay=0)
+
+    def fake_send_command(command: Any, callback_handler: Any) -> tuple[str, str]:
+        callback_handler.handler_obj.set_result(
+            {"id": "press-1", "code": 500, "msg": "bad"}
+        )
+        return "press-1", "release-1"
+
+    with patch.object(
+        client, "_send_command", AsyncMock(side_effect=fake_send_command)
+    ):
+        result = await client.send_commands([cmd])
+
+    assert len(result) == 1
+    assert result[0].command == cmd
+    assert result[0].code == 500
+    assert result[0].msg == "bad"
+
+
+async def test_send_commands_skips_response_without_message_id(
+    populated_client: HarmonyClient,
+) -> None:
+    """A response missing an id is logged and skipped, not raised."""
+    client = populated_client
+    cmd = SendCommandDevice(device=100, command="PowerOn", delay=0)
+
+    def fake_send_command(command: Any, callback_handler: Any) -> tuple[str, str]:
+        callback_handler.handler_obj.set_result({"code": 500, "msg": "x"})
+        return "press-1", "release-1"
+
+    with patch.object(
+        client, "_send_command", AsyncMock(side_effect=fake_send_command)
+    ):
+        result = await client.send_commands([cmd])
+
+    assert result == []
+
+
+async def test_send_commands_skips_unknown_message_id(
+    populated_client: HarmonyClient,
+) -> None:
+    """A response whose id isn't in the sent map is skipped."""
+    client = populated_client
+    cmd = SendCommandDevice(device=100, command="PowerOn", delay=0)
+
+    def fake_send_command(command: Any, callback_handler: Any) -> tuple[None, None]:
+        callback_handler.handler_obj.set_result(
+            {"id": "unknown", "code": 500, "msg": "x"}
+        )
+        return None, None
+
+    with patch.object(
+        client, "_send_command", AsyncMock(side_effect=fake_send_command)
+    ):
+        result = await client.send_commands([cmd])
+
+    assert result == []
+
+
+# ---------------------------------------------------------------------------
+# _send_command
+# ---------------------------------------------------------------------------
+
+
+async def test_send_command_press_and_release_with_zero_delay(
+    populated_client: HarmonyClient,
+) -> None:
+    """A zero-delay command sends press then release and returns both ids."""
+    client = populated_client
+    client.register_handler = MagicMock(return_value="uuid")
+    cmd = SendCommandDevice(device=100, command="PowerOn", delay=0)
+
+    with patch.object(client, "send_to_hub", AsyncMock(return_value=True)) as send:
+        press, release = await client._send_command(cmd, MagicMock())  # noqa: SLF001
+
+    assert press is not None
+    assert release is not None
+    assert press != release
+    assert send.await_count == 2
+    assert client.register_handler.call_count == 2
+
+
+async def test_send_command_sleeps_between_press_and_release_when_delayed(
+    populated_client: HarmonyClient,
+) -> None:
+    """A positive delay sleeps for that interval between press and release."""
+    client = populated_client
+    client.register_handler = MagicMock(return_value="uuid")
+    cmd = SendCommandDevice(device=100, command="PowerOn", delay=0.5)
+
+    with (
+        patch("asyncio.sleep", AsyncMock()) as sleep,
+        patch.object(client, "send_to_hub", AsyncMock(return_value=True)),
+    ):
+        await client._send_command(cmd, MagicMock())  # noqa: SLF001
+
+    sleep.assert_awaited_once_with(0.5)
+
+
+async def test_send_command_aborts_when_press_send_fails(
+    populated_client: HarmonyClient,
+) -> None:
+    """A falsy response to the press send returns (None, None) without release."""
+    client = populated_client
+    client.register_handler = MagicMock(return_value="uuid")
+    cmd = SendCommandDevice(device=100, command="PowerOn", delay=0)
+
+    with patch.object(client, "send_to_hub", AsyncMock(return_value=None)) as send:
+        result = await client._send_command(cmd, MagicMock())  # noqa: SLF001
+
+    assert result == (None, None)
+    assert send.await_count == 1
