@@ -309,25 +309,23 @@ class HubConnector(slixmpp.ClientXMPP):
         self._deregister_handlers()
         self._init_super()
 
-        sleep_time = 1
-        while True:
-            await asyncio.sleep(sleep_time)
-            # Re-read the flags between attempts so a concurrent
-            # hub_disconnect() (or auto_reconnect being turned off) actually
-            # stops the retry loop. Unlike the websocket connector, _connected
-            # is already False here for the whole reconnect, so the explicit
-            # _disconnect_requested flag carries the caller's intent.
+        def _stop_reason() -> str | None:
+            # Re-read the flags so a concurrent hub_disconnect() (or
+            # auto_reconnect being turned off) actually stops the retry loop.
+            # Unlike the websocket connector, _connected is already False here
+            # for the whole reconnect, so the explicit _disconnect_requested
+            # flag carries the caller's intent.
             if self._disconnect_requested:
-                _LOGGER.debug(
-                    "%s: Disconnect requested during reconnect, stopping",
-                    self._ip_address,
-                )
-                return
+                return "Disconnect requested during reconnect, stopping"
             if not self._auto_reconnect:
-                _LOGGER.debug(
-                    "%s: Auto-reconnect disabled during reconnect, stopping",
-                    self._ip_address,
-                )
+                return "Auto-reconnect disabled during reconnect, stopping"
+            return None
+
+        sleep_time = 1
+        await asyncio.sleep(sleep_time)
+        while True:
+            if reason := _stop_reason():
+                _LOGGER.debug("%s: %s", self._ip_address, reason)
                 return
             try:
                 if await self.hub_connect(is_reconnect=is_reconnect):
@@ -335,8 +333,15 @@ class HubConnector(slixmpp.ClientXMPP):
                     return
             except IqTimeout:
                 pass
-            sleep_time = min(sleep_time * 2, 30)
             is_reconnect = True
+            # Re-check intent after the attempt too: intent that changed during
+            # hub_connect() must not wait out the (up to 30s) backoff sleep.
+            if reason := _stop_reason():
+                _LOGGER.debug("%s: %s", self._ip_address, reason)
+                return
+            # Wait and try again, doubling the backoff up to 30s.
+            await asyncio.sleep(sleep_time)
+            sleep_time = min(sleep_time * 2, 30)
 
     async def hub_send(
         self, command, iq_type="get", params=None, msgid=None, post=False

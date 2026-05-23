@@ -306,6 +306,63 @@ async def test_disconnected_handler_stops_when_auto_reconnect_cleared_mid_reconn
 
 
 @pytest.mark.asyncio
+async def test_disconnected_handler_backoff_sequence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Reconnect backoff keeps the 1, 1, 2, 4 cadence and skips sleep on success."""
+    hub = _make_hub()
+    hub._connected = True  # noqa: SLF001
+
+    delays: list[float] = []
+
+    async def record_sleep(delay: float) -> None:
+        delays.append(delay)
+
+    monkeypatch.setattr("aioharmony.hubconnector_xmpp.asyncio.sleep", record_sleep)
+
+    outcomes = iter([False, False, False, True])
+
+    async def fake_hub_connect(is_reconnect: bool = False) -> bool:
+        return next(outcomes)
+
+    hub.hub_connect = fake_hub_connect  # type: ignore[method-assign]
+    hub._deregister_handlers = MagicMock()  # type: ignore[method-assign]  # noqa: SLF001
+    hub._init_super = MagicMock()  # type: ignore[method-assign]  # noqa: SLF001
+
+    await hub._disconnected_handler(None)  # noqa: SLF001
+
+    assert delays == [1, 1, 2, 4]
+
+
+@pytest.mark.asyncio
+async def test_disconnected_handler_stops_before_backoff_when_disconnect_mid_connect(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Disconnect during hub_connect() exits before the backoff sleep."""
+    hub = _make_hub()
+    hub._connected = True  # noqa: SLF001
+
+    delays: list[float] = []
+
+    async def record_sleep(delay: float) -> None:
+        delays.append(delay)
+
+    monkeypatch.setattr("aioharmony.hubconnector_xmpp.asyncio.sleep", record_sleep)
+
+    async def fake_hub_connect(is_reconnect: bool = False) -> bool:
+        hub._disconnect_requested = True  # noqa: SLF001
+        return False
+
+    hub.hub_connect = fake_hub_connect  # type: ignore[method-assign]
+    hub._deregister_handlers = MagicMock()  # type: ignore[method-assign]  # noqa: SLF001
+    hub._init_super = MagicMock()  # type: ignore[method-assign]  # noqa: SLF001
+
+    await hub._disconnected_handler(None)  # noqa: SLF001
+
+    assert delays == [1]
+
+
+@pytest.mark.asyncio
 async def test_hub_disconnect_sets_disconnect_requested_flag() -> None:
     """hub_disconnect records intent even when nothing is connected."""
     hub = _make_hub()
