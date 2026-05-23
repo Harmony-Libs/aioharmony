@@ -1350,7 +1350,7 @@ async def test_send_command_aborts_when_press_send_fails(
     client.register_handler = MagicMock(return_value="uuid")
     cmd = SendCommandDevice(device=100, command="PowerOn", delay=0)
 
-    with patch.object(client, "send_to_hub", AsyncMock(return_value=None)) as send:
+    with patch.object(client, "send_to_hub", AsyncMock(return_value=False)) as send:
         result = await client._send_command(cmd, MagicMock())  # noqa: SLF001
 
     assert result == (None, None)
