@@ -1355,3 +1355,35 @@ async def test_send_command_aborts_when_press_send_fails(
 
     assert result == (None, None)
     assert send.await_count == 1
+
+
+# ---------------------------------------------------------------------------
+# send_commands / start_activity / _send_command edge cases
+# ---------------------------------------------------------------------------
+
+
+async def test_start_activity_returns_failure_when_send_returns_falsy(
+    client: HarmonyClient,
+) -> None:
+    """start_activity aborts immediately instead of hanging when the hub send fails."""
+    with patch.object(client, "send_to_hub", AsyncMock(return_value=None)):
+        result = await asyncio.wait_for(client.start_activity(1), timeout=1)
+    assert result == (False, None)
+
+
+async def test_send_commands_returns_empty_when_only_sleeps(
+    client: HarmonyClient,
+) -> None:
+    """A command list of only delays creates no futures; wait([]) would raise."""
+    result = await client.send_commands([0.0])
+    assert result == []
+
+
+async def test_send_command_handles_none_delay(client: HarmonyClient) -> None:
+    """delay=None must not raise a TypeError on the `delay > 0` comparison."""
+    cmd = SendCommandDevice(device=100, command="PowerOn", delay=None)
+    handler = MagicMock()
+    with patch.object(client, "send_to_hub", AsyncMock(return_value=True)):
+        msgid_press, msgid_release = await client._send_command(cmd, handler)  # noqa: SLF001
+    assert msgid_press is not None
+    assert msgid_release is not None

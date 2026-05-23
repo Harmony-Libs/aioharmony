@@ -844,6 +844,7 @@ class HarmonyClient:
             )
             if not response:
                 unregister_handlers()
+                return False, None
 
             try:
                 async with timeout(DEFAULT_TIMEOUT):
@@ -900,6 +901,10 @@ class HarmonyClient:
         # Go through the result list to determine there were any issues with
         # any of the commands sent. Only if there is an issue would a response
         # have been received.
+        # asyncio.wait raises ValueError on an empty set, which happens when
+        # every entry was a sleep (float/int) and no command future was created.
+        if not command_future_list:
+            return []
         done, _ = await asyncio.wait(command_future_list, timeout=1)
 
         error_response_list = []
@@ -985,7 +990,7 @@ class HarmonyClient:
             # There was an issue
             return None, None
 
-        if command.delay > 0:
+        if command.delay is not None and command.delay > 0:
             await asyncio.sleep(command.delay)
 
         params["status"] = "release"
