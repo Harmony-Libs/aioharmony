@@ -258,6 +258,82 @@ async def test_disconnected_handler_retries_after_iqtimeout_and_failure() -> Non
 
 
 @pytest.mark.asyncio
+async def test_disconnected_handler_stops_when_disconnect_requested_mid_reconnect() -> (
+    None
+):
+    """A hub_disconnect() during the retry loop stops further reconnect attempts."""
+    hub = _make_hub()
+    hub._connected = True  # noqa: SLF001
+
+    flags: list[bool] = []
+
+    async def fake_hub_connect(is_reconnect: bool = False) -> bool:
+        flags.append(is_reconnect)
+        hub._disconnect_requested = True  # noqa: SLF001
+        return False
+
+    hub.hub_connect = fake_hub_connect  # type: ignore[method-assign]
+    hub._deregister_handlers = MagicMock()  # type: ignore[method-assign]  # noqa: SLF001
+    hub._init_super = MagicMock()  # type: ignore[method-assign]  # noqa: SLF001
+
+    await hub._disconnected_handler(None)  # noqa: SLF001
+
+    assert flags == [False]
+
+
+@pytest.mark.asyncio
+async def test_disconnected_handler_stops_when_auto_reconnect_cleared_mid_reconnect() -> (
+    None
+):
+    """Clearing auto_reconnect during the retry loop stops further attempts."""
+    hub = _make_hub()
+    hub._connected = True  # noqa: SLF001
+
+    flags: list[bool] = []
+
+    async def fake_hub_connect(is_reconnect: bool = False) -> bool:
+        flags.append(is_reconnect)
+        hub._auto_reconnect = False  # noqa: SLF001
+        return False
+
+    hub.hub_connect = fake_hub_connect  # type: ignore[method-assign]
+    hub._deregister_handlers = MagicMock()  # type: ignore[method-assign]  # noqa: SLF001
+    hub._init_super = MagicMock()  # type: ignore[method-assign]  # noqa: SLF001
+
+    await hub._disconnected_handler(None)  # noqa: SLF001
+
+    assert flags == [False]
+
+
+@pytest.mark.asyncio
+async def test_hub_disconnect_sets_disconnect_requested_flag() -> None:
+    """hub_disconnect records intent even when nothing is connected."""
+    hub = _make_hub()
+
+    await hub.hub_disconnect()
+
+    assert hub._disconnect_requested is True  # noqa: SLF001
+
+
+@pytest.mark.asyncio
+async def test_hub_connect_clears_disconnect_requested_on_success() -> None:
+    """A successful connect resets the disconnect-requested flag."""
+    hub = _make_hub()
+    hub._disconnect_requested = True  # noqa: SLF001
+
+    def fake_connect(self: slixmpp.ClientXMPP, *args: object, **kwargs: object) -> None:
+        loop = asyncio.get_running_loop()
+        loop.call_soon(self.event, "connected", None)
+
+    with patch.object(slixmpp.ClientXMPP, "connect", fake_connect):
+        result = await hub.hub_connect()
+
+    assert result is True
+    assert hub._disconnect_requested is False  # noqa: SLF001
+    await hub.hub_disconnect()
+
+
+@pytest.mark.asyncio
 async def test_listener_message_received_parses_json() -> None:
     """JSON payloads land in the response queue as a dict."""
     hub = _make_hub()
