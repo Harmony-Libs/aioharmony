@@ -1387,3 +1387,23 @@ async def test_send_command_handles_none_delay(client: HarmonyClient) -> None:
         msgid_press, msgid_release = await client._send_command(cmd, handler)  # noqa: SLF001
     assert msgid_press is not None
     assert msgid_release is not None
+
+
+async def test_send_command_drops_release_handler_when_release_send_fails(
+    populated_client: HarmonyClient,
+) -> None:
+    """A failed release send keeps msgid_press but drops the release handler."""
+    client = populated_client
+    client.register_handler = MagicMock(side_effect=["uuid_press", "uuid_release"])
+    client.unregister_handler = MagicMock()
+    cmd = SendCommandDevice(device=100, command="PowerOn", delay=0)
+
+    with patch.object(
+        client, "send_to_hub", AsyncMock(side_effect=[True, False])
+    ) as send:
+        msgid_press, msgid_release = await client._send_command(cmd, MagicMock())  # noqa: SLF001
+
+    assert msgid_press is not None
+    assert msgid_release is None
+    assert send.await_count == 2
+    client.unregister_handler.assert_called_once_with("uuid_release")
