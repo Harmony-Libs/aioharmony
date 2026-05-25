@@ -363,6 +363,36 @@ async def test_disconnected_handler_stops_before_backoff_when_disconnect_mid_con
 
 
 @pytest.mark.asyncio
+async def test_disconnected_handler_stops_at_loop_top_when_disconnect_before_attempt(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Disconnect during the pre-loop sleep stops before the first reconnect attempt."""
+    hub = _make_hub()
+    hub._connected = True  # noqa: SLF001
+
+    flags: list[bool] = []
+
+    async def set_intent_during_sleep(_delay: float) -> None:
+        hub._disconnect_requested = True  # noqa: SLF001
+
+    monkeypatch.setattr(
+        "aioharmony.hubconnector_xmpp.asyncio.sleep", set_intent_during_sleep
+    )
+
+    async def fake_hub_connect(is_reconnect: bool = False) -> bool:
+        flags.append(is_reconnect)
+        return False
+
+    hub.hub_connect = fake_hub_connect  # type: ignore[method-assign]
+    hub._deregister_handlers = MagicMock()  # type: ignore[method-assign]  # noqa: SLF001
+    hub._init_super = MagicMock()  # type: ignore[method-assign]  # noqa: SLF001
+
+    await hub._disconnected_handler(None)  # noqa: SLF001
+
+    assert flags == []
+
+
+@pytest.mark.asyncio
 async def test_hub_disconnect_sets_disconnect_requested_flag() -> None:
     """hub_disconnect records intent even when nothing is connected."""
     hub = _make_hub()
