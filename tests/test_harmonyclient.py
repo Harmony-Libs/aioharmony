@@ -1350,8 +1350,60 @@ async def test_send_command_aborts_when_press_send_fails(
     client.register_handler = MagicMock(return_value="uuid")
     cmd = SendCommandDevice(device=100, command="PowerOn", delay=0)
 
-    with patch.object(client, "send_to_hub", AsyncMock(return_value=None)) as send:
+    with patch.object(client, "send_to_hub", AsyncMock(return_value=False)) as send:
         result = await client._send_command(cmd, MagicMock())  # noqa: SLF001
 
     assert result == (None, None)
     assert send.await_count == 1
+
+
+# ---------------------------------------------------------------------------
+# send_commands / start_activity / _send_command edge cases
+# ---------------------------------------------------------------------------
+
+
+async def test_start_activity_returns_failure_when_send_returns_falsy(
+    client: HarmonyClient,
+) -> None:
+    """start_activity aborts immediately instead of hanging when the hub send fails."""
+    with patch.object(client, "send_to_hub", AsyncMock(return_value=False)):
+        result = await asyncio.wait_for(client.start_activity(1), timeout=1)
+    assert result == (False, None)
+
+
+async def test_send_commands_returns_empty_when_only_sleeps(
+    client: HarmonyClient,
+) -> None:
+    """A command list of only delays creates no futures; wait([]) would raise."""
+    result = await client.send_commands([0.0])
+    assert result == []
+
+
+async def test_send_command_handles_none_delay(client: HarmonyClient) -> None:
+    """delay=None must not raise a TypeError on the `delay > 0` comparison."""
+    cmd = SendCommandDevice(device=100, command="PowerOn", delay=None)
+    handler = MagicMock()
+    with patch.object(client, "send_to_hub", AsyncMock(return_value=True)):
+        msgid_press, msgid_release = await client._send_command(cmd, handler)  # noqa: SLF001
+    assert msgid_press is not None
+    assert msgid_release is not None
+
+
+async def test_send_command_drops_release_handler_when_release_send_fails(
+    populated_client: HarmonyClient,
+) -> None:
+    """A failed release send keeps msgid_press but drops the release handler."""
+    client = populated_client
+    client.register_handler = MagicMock(side_effect=["uuid_press", "uuid_release"])
+    client.unregister_handler = MagicMock()
+    cmd = SendCommandDevice(device=100, command="PowerOn", delay=0)
+
+    with patch.object(
+        client, "send_to_hub", AsyncMock(side_effect=[True, False])
+    ) as send:
+        msgid_press, msgid_release = await client._send_command(cmd, MagicMock())  # noqa: SLF001
+
+    assert msgid_press is not None
+    assert msgid_release is None
+    assert send.await_count == 2
+    client.unregister_handler.assert_called_once_with("uuid_release")

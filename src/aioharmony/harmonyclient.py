@@ -844,6 +844,7 @@ class HarmonyClient:
             )
             if not response:
                 unregister_handlers()
+                return False, None
 
             try:
                 async with timeout(DEFAULT_TIMEOUT):
@@ -900,6 +901,10 @@ class HarmonyClient:
         # Go through the result list to determine there were any issues with
         # any of the commands sent. Only if there is an issue would a response
         # have been received.
+        # asyncio.wait raises ValueError on an empty set, which happens when
+        # every entry was a sleep (float/int) and no command future was created.
+        if not command_future_list:
+            return []
         done, _ = await asyncio.wait(command_future_list, timeout=1)
 
         error_response_list = []
@@ -975,28 +980,38 @@ class HarmonyClient:
         msgid_press = str(uuid4())
 
         # Register the handler for this command.
-        self.register_handler(handler=callback_handler, msgid=msgid_press)
+        handler_uuid_press = self.register_handler(
+            handler=callback_handler, msgid=msgid_press
+        )
 
         # Send the command to the HUB
         response = await self.send_to_hub(
             command="send_command", params=params, msgid=msgid_press, wait=False
         )
         if not response:
-            # There was an issue
+            # There was an issue; drop the handler we just registered so it
+            # does not linger until ResponseHandler next purges expired ones.
+            self.unregister_handler(handler_uuid_press)
             return None, None
 
-        if command.delay > 0:
+        if command.delay is not None and command.delay > 0:
             await asyncio.sleep(command.delay)
 
         params["status"] = "release"
 
         msgid_release = str(uuid4())
         # Register the handler for this command.
-        self.register_handler(handler=callback_handler, msgid=msgid_release)
+        handler_uuid_release = self.register_handler(
+            handler=callback_handler, msgid=msgid_release
+        )
         # Send the command to the HUB
-        await self.send_to_hub(
+        response = await self.send_to_hub(
             command="send_command", params=params, msgid=msgid_release, wait=False
         )
+        if not response:
+            # Release send failed; drop its handler too.
+            self.unregister_handler(handler_uuid_release)
+            return msgid_press, None
 
         _LOGGER.debug(
             "%s: Sending command %s to device %s (%s) with delay %ss has been completed",
