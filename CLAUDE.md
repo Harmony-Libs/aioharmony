@@ -178,10 +178,12 @@ on `ubuntu-latest` (see `ci.yml`). There's no Windows or macOS leg
 and no big-endian leg — the wire format is JSON over WebSocket /
 XMPP so endianness doesn't come up.
 
-`pytest-asyncio` is in the dev group; tests use the standard
-`@pytest.mark.asyncio` decorator. Coverage is collected via
-`pytest-cov` with `branch = true` and uploaded to Codecov from
-each matrix cell.
+`pytest-asyncio` is in the dev group and runs in `asyncio_mode =
+"auto"` (set in `pyproject.toml`), so every `async def test_*`
+is collected as an asyncio test automatically — don't add
+`@pytest.mark.asyncio` decorators or module-level `pytestmark`
+lines. Coverage is collected via `pytest-cov` with `branch =
+true` and uploaded to Codecov from each matrix cell.
 
 ### Reconnect-test fixture
 

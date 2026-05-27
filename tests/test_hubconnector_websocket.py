@@ -85,7 +85,6 @@ async def _run_listener_once(
     return hub_connect
 
 
-@pytest.mark.asyncio
 async def test_listener_reconnects_on_client_error_during_receive() -> None:
     """A ClientError from receive() must trigger reconnect.
 
@@ -101,7 +100,6 @@ async def test_listener_reconnects_on_client_error_during_receive() -> None:
     assert hub_connect.await_count == 1
 
 
-@pytest.mark.asyncio
 async def test_listener_reconnects_on_ws_error_message() -> None:
     """A WSMsgType.ERROR message must trigger reconnect, not spin."""
     fake_ws = FakeWebSocket(
@@ -114,7 +112,6 @@ async def test_listener_reconnects_on_ws_error_message() -> None:
     assert hub_connect.await_count == 1
 
 
-@pytest.mark.asyncio
 async def test_listener_reconnects_on_ws_close_message() -> None:
     """A WSMsgType.CLOSE handshake must trigger reconnect immediately."""
     fake_ws = FakeWebSocket([_make_message(aiohttp.WSMsgType.CLOSE, data=1000)])
@@ -125,7 +122,6 @@ async def test_listener_reconnects_on_ws_close_message() -> None:
     assert hub_connect.await_count == 1
 
 
-@pytest.mark.asyncio
 async def test_listener_reconnects_on_ws_closing_message() -> None:
     """A WSMsgType.CLOSING handshake must trigger reconnect immediately."""
     fake_ws = FakeWebSocket([_make_message(aiohttp.WSMsgType.CLOSING, data=1000)])
@@ -136,7 +132,6 @@ async def test_listener_reconnects_on_ws_closing_message() -> None:
     assert hub_connect.await_count == 1
 
 
-@pytest.mark.asyncio
 async def test_listener_reconnects_on_ws_closed_message() -> None:
     """A WSMsgType.CLOSED message must trigger reconnect (existing behavior)."""
     fake_ws = FakeWebSocket([_make_message(aiohttp.WSMsgType.CLOSED, data=1000)])
@@ -147,7 +142,6 @@ async def test_listener_reconnects_on_ws_closed_message() -> None:
     assert hub_connect.await_count == 1
 
 
-@pytest.mark.asyncio
 async def test_listener_reconnects_on_unexpected_exception() -> None:
     """An unexpected exception inside the loop must trigger reconnect.
 
@@ -174,7 +168,6 @@ async def test_listener_reconnects_on_unexpected_exception() -> None:
     assert hub_connect.await_count == 1
 
 
-@pytest.mark.asyncio
 async def test_listener_does_not_reconnect_when_disconnected() -> None:
     """If the user called disconnect, reconnect must not fire."""
     fake_ws = FakeWebSocket([aiohttp.ClientError])
@@ -186,7 +179,6 @@ async def test_listener_does_not_reconnect_when_disconnected() -> None:
     assert hub_connect.await_count == 0
 
 
-@pytest.mark.asyncio
 async def test_listener_passes_text_message_to_queue() -> None:
     """Sanity check: TEXT messages still flow to the response queue."""
     text_msg = _make_message(aiohttp.WSMsgType.TEXT)
@@ -201,7 +193,6 @@ async def test_listener_passes_text_message_to_queue() -> None:
     assert connector._response_queue.get_nowait() == {"hello": "world"}  # noqa: SLF001
 
 
-@pytest.mark.asyncio
 async def test_listener_does_not_reconnect_when_auto_reconnect_disabled() -> None:
     """auto_reconnect=False must suppress reconnect even on ClientError."""
     queue: asyncio.Queue = asyncio.Queue()
@@ -236,7 +227,6 @@ def fast_sleep(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("aioharmony.hubconnector_websocket.asyncio.sleep", _no_sleep)
 
 
-@pytest.mark.asyncio
 async def test_reconnect_stops_when_disconnect_called_during_retry() -> None:
     """A concurrent hub_disconnect() must end the retry loop.
 
@@ -262,7 +252,6 @@ async def test_reconnect_stops_when_disconnect_called_during_retry() -> None:
     assert hub_connect.await_count == 1
 
 
-@pytest.mark.asyncio
 async def test_reconnect_stops_when_auto_reconnect_disabled_during_retry() -> None:
     """Flipping auto_reconnect off during retries must also stop the loop."""
     connector = _make_connector()
@@ -280,7 +269,6 @@ async def test_reconnect_stops_when_auto_reconnect_disabled_during_retry() -> No
     assert hub_connect.await_count == 1
 
 
-@pytest.mark.asyncio
 async def test_reconnect_retries_until_success() -> None:
     """The retry loop keeps trying with is_reconnect=True after the first miss."""
     connector = _make_connector()
@@ -299,7 +287,6 @@ async def test_reconnect_retries_until_success() -> None:
     assert later_call_kwargs.get("is_reconnect") is True
 
 
-@pytest.mark.asyncio
 async def test_reconnect_does_not_clobber_connected_flag() -> None:
     """_reconnect must leave self._connected alone.
 
@@ -318,7 +305,6 @@ async def test_reconnect_does_not_clobber_connected_flag() -> None:
     assert connector._connected is True  # noqa: SLF001
 
 
-@pytest.mark.asyncio
 async def test_callbacks_property_roundtrip() -> None:
     """Callbacks getter/setter is a simple pass-through."""
     connector = _make_connector()
@@ -329,7 +315,6 @@ async def test_callbacks_property_roundtrip() -> None:
     assert connector.callbacks is new_cb
 
 
-@pytest.mark.asyncio
 async def test_close_delegates_to_hub_disconnect() -> None:
     """close() is a thin wrapper that just disconnects."""
     connector = _make_connector()
@@ -340,7 +325,6 @@ async def test_close_delegates_to_hub_disconnect() -> None:
     connector.hub_disconnect.assert_awaited_once()
 
 
-@pytest.mark.asyncio
 async def test_get_remote_id_returns_cached_value() -> None:
     """A previously-resolved remote id short-circuits the HTTP lookup."""
     connector = _make_connector()
@@ -352,7 +336,6 @@ async def test_get_remote_id_returns_cached_value() -> None:
     connector._retrieve_hub_info.assert_not_called()  # noqa: SLF001
 
 
-@pytest.mark.asyncio
 async def test_get_remote_id_populates_from_hub_info() -> None:
     """When uncached, get_remote_id fetches and stores remoteId + domain."""
     connector = _make_connector()
@@ -371,7 +354,6 @@ async def test_get_remote_id_populates_from_hub_info() -> None:
     assert connector._domain == "hub.example.com"  # noqa: SLF001
 
 
-@pytest.mark.asyncio
 async def test_get_remote_id_falls_back_to_default_domain() -> None:
     """A discoveryServer without a netloc must leave _domain at the default."""
     connector = _make_connector()
@@ -385,7 +367,6 @@ async def test_get_remote_id_falls_back_to_default_domain() -> None:
     assert connector._domain == "svcs.myharmony.com"  # noqa: SLF001
 
 
-@pytest.mark.asyncio
 async def test_get_remote_id_handles_missing_hub_info() -> None:
     """If _retrieve_hub_info returns None, get_remote_id returns None."""
     connector = _make_connector()
@@ -397,7 +378,6 @@ async def test_get_remote_id_handles_missing_hub_info() -> None:
     assert result is None
 
 
-@pytest.mark.asyncio
 async def test_async_close_session_noop_when_none() -> None:
     """async_close_session is a no-op if no aiohttp session was opened."""
     connector = _make_connector()
@@ -408,7 +388,6 @@ async def test_async_close_session_noop_when_none() -> None:
     assert connector._aiohttp_session is None  # noqa: SLF001
 
 
-@pytest.mark.asyncio
 async def test_async_close_session_closes_session() -> None:
     """async_close_session closes the underlying aiohttp session."""
     connector = _make_connector()
@@ -422,7 +401,6 @@ async def test_async_close_session_closes_session() -> None:
     assert connector._aiohttp_session is None  # noqa: SLF001
 
 
-@pytest.mark.asyncio
 async def test_async_close_session_swallows_timeout() -> None:
     """A TimeoutError raised by session.close must not propagate."""
     connector = _make_connector()
@@ -433,7 +411,6 @@ async def test_async_close_session_swallows_timeout() -> None:
     await connector.async_close_session()  # must not raise
 
 
-@pytest.mark.asyncio
 async def test_hub_connect_short_circuits_when_already_open() -> None:
     """An open websocket means hub_connect returns True without touching the session."""
     connector = _make_connector()
@@ -449,7 +426,6 @@ async def test_hub_connect_short_circuits_when_already_open() -> None:
     assert await connector.hub_connect() is True
 
 
-@pytest.mark.asyncio
 async def test_hub_connect_returns_false_without_remote_id() -> None:
     """Without a resolvable remote id, hub_connect bails out as False."""
     connector = _make_connector()
@@ -459,7 +435,6 @@ async def test_hub_connect_returns_false_without_remote_id() -> None:
     assert await connector.hub_connect() is False
 
 
-@pytest.mark.asyncio
 async def test_hub_connect_handles_server_timeout() -> None:
     """A ServerTimeoutError during ws_connect leaves _websocket cleared."""
     connector = _make_connector()
@@ -471,7 +446,6 @@ async def test_hub_connect_handles_server_timeout() -> None:
     assert connector._websocket is None  # noqa: SLF001
 
 
-@pytest.mark.asyncio
 async def test_hub_connect_handles_client_error() -> None:
     """A ClientError during ws_connect leaves _websocket cleared."""
     connector = _make_connector()
@@ -483,7 +457,6 @@ async def test_hub_connect_handles_client_error() -> None:
     assert connector._websocket is None  # noqa: SLF001
 
 
-@pytest.mark.asyncio
 async def test_hub_connect_handles_handshake_error_with_status(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
@@ -511,7 +484,6 @@ async def test_hub_connect_handles_handshake_error_with_status(
     assert any("Invalid status code 401" in r.message for r in caplog.records)
 
 
-@pytest.mark.asyncio
 async def test_hub_connect_success_fires_callback_and_starts_listener() -> None:
     """Successful ws_connect creates the listener task and notifies the connect callback."""
     connect_cb = MagicMock()
@@ -545,7 +517,6 @@ async def test_hub_connect_success_fires_callback_and_starts_listener() -> None:
         await connector._listener_task  # noqa: SLF001
 
 
-@pytest.mark.asyncio
 async def test_hub_disconnect_with_no_websocket_just_flips_flag() -> None:
     """hub_disconnect without an open websocket only marks _connected False."""
     connector = _make_connector()
@@ -557,7 +528,6 @@ async def test_hub_disconnect_with_no_websocket_just_flips_flag() -> None:
     assert connector._connected is False  # noqa: SLF001
 
 
-@pytest.mark.asyncio
 async def test_hub_disconnect_closes_websocket_and_session() -> None:
     """hub_disconnect closes the websocket, the session, and clears _websocket."""
     connector = _make_connector()
@@ -582,7 +552,6 @@ async def test_hub_disconnect_closes_websocket_and_session() -> None:
     assert connector._connected is False  # noqa: SLF001
 
 
-@pytest.mark.asyncio
 async def test_hub_disconnect_cancels_running_listener() -> None:
     """hub_disconnect cancels a still-running listener task."""
     connector = _make_connector()
@@ -603,7 +572,6 @@ async def test_hub_disconnect_cancels_running_listener() -> None:
     listener_task.cancel.assert_called_once()
 
 
-@pytest.mark.asyncio
 async def test_hub_send_post_creates_background_task() -> None:
     """hub_send(post=True) hands off to hub_post via a background task."""
     connector = _make_connector()
@@ -615,7 +583,6 @@ async def test_hub_send_post_creates_background_task() -> None:
     assert await result == {"ok": True}
 
 
-@pytest.mark.asyncio
 async def test_hub_send_returns_none_when_connect_fails() -> None:
     """hub_send returns None if hub_connect cannot establish a session."""
     connector = _make_connector()
@@ -624,7 +591,6 @@ async def test_hub_send_returns_none_when_connect_fails() -> None:
     assert await connector.hub_send("cmd", {}) is None
 
 
-@pytest.mark.asyncio
 async def test_hub_send_returns_msgid_on_success() -> None:
     """A successful hub_send returns the message id used in the payload."""
     connector = _make_connector()
@@ -642,7 +608,6 @@ async def test_hub_send_returns_msgid_on_success() -> None:
     assert sent_payload["hbus"]["id"] == "fixed-id"
 
 
-@pytest.mark.asyncio
 async def test_hub_send_returns_none_on_client_error() -> None:
     """A ClientError during send_json returns None instead of raising."""
     connector = _make_connector()
@@ -667,7 +632,6 @@ class _AsyncContextManager:
         return None
 
 
-@pytest.mark.asyncio
 async def test_hub_post_returns_parsed_response() -> None:
     """hub_post returns the JSON body parsed by aiohttp."""
     connector = _make_connector()
@@ -682,7 +646,6 @@ async def test_hub_post_returns_parsed_response() -> None:
     assert result == {"data": {"hello": "world"}}
 
 
-@pytest.mark.asyncio
 async def test_hub_post_returns_none_on_client_error() -> None:
     """hub_post swallows aiohttp.ClientError and returns None."""
     connector = _make_connector()
@@ -693,7 +656,6 @@ async def test_hub_post_returns_none_on_client_error() -> None:
     assert await connector.hub_post("http://hub/", {}) is None
 
 
-@pytest.mark.asyncio
 async def test_retrieve_hub_info_returns_inner_data() -> None:
     """_retrieve_hub_info unwraps the 'data' envelope from hub_post."""
     connector = _make_connector()
@@ -706,7 +668,6 @@ async def test_retrieve_hub_info_returns_inner_data() -> None:
     assert result == {"activeRemoteId": "x"}
 
 
-@pytest.mark.asyncio
 async def test_retrieve_hub_info_returns_none_when_post_failed() -> None:
     """_retrieve_hub_info passes None through when hub_post returned nothing."""
     connector = _make_connector()
@@ -715,7 +676,6 @@ async def test_retrieve_hub_info_returns_none_when_post_failed() -> None:
     assert await connector._retrieve_hub_info() is None  # noqa: SLF001
 
 
-@pytest.mark.asyncio
 async def test_listener_skips_empty_text_message() -> None:
     """A TEXT message whose .json() is falsy must not be queued."""
     empty_text = _make_message(aiohttp.WSMsgType.TEXT)
@@ -730,7 +690,6 @@ async def test_listener_skips_empty_text_message() -> None:
     assert connector._response_queue.empty()  # noqa: SLF001
 
 
-@pytest.mark.asyncio
 async def test_listener_ignores_non_text_non_close_messages() -> None:
     """Binary / ping / pong frames are ignored - the loop just keeps reading."""
     fake_ws = FakeWebSocket(
@@ -746,7 +705,6 @@ async def test_listener_ignores_non_text_non_close_messages() -> None:
     assert hub_connect.await_count == 1  # CLOSED still triggers reconnect
 
 
-@pytest.mark.asyncio
 async def test_listener_logs_when_no_websocket_argument() -> None:
     """Calling _listener without a websocket and with no _websocket logs + exits."""
     connector = _make_connector()

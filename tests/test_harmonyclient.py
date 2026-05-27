@@ -21,8 +21,6 @@ from aioharmony.const import (
 )
 from aioharmony.harmonyclient import HarmonyClient
 
-pytestmark = pytest.mark.asyncio
-
 
 def _make_callbacks(**overrides: Any) -> ClientCallbackType:
     fields: dict[str, Any] = {

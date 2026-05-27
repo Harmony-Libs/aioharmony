@@ -70,7 +70,6 @@ def test_logging_filter_no_match_filtered() -> None:
     assert cli.LoggingFilter(["aioharmony"]).filter(rec) is False
 
 
-@pytest.mark.asyncio
 async def test_get_client_connects_successfully(
     monkeypatch: pytest.MonkeyPatch,
     mock_client: MagicMock,
@@ -88,7 +87,6 @@ async def test_get_client_connects_successfully(
     assert "Connected to HUB" in out
 
 
-@pytest.mark.asyncio
 async def test_get_client_connect_returns_false(
     monkeypatch: pytest.MonkeyPatch,
     mock_client: MagicMock,
@@ -103,7 +101,6 @@ async def test_get_client_connect_returns_false(
     assert "An issue occurred" in capsys.readouterr().out
 
 
-@pytest.mark.asyncio
 async def test_get_client_connection_refused(
     monkeypatch: pytest.MonkeyPatch,
     mock_client: MagicMock,
@@ -119,7 +116,6 @@ async def test_get_client_connection_refused(
     assert "Failed to connect" in out
 
 
-@pytest.mark.asyncio
 async def test_show_config(
     mock_client: MagicMock, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -127,7 +123,6 @@ async def test_show_config(
     assert "Living Room" in capsys.readouterr().out
 
 
-@pytest.mark.asyncio
 async def test_show_config_missing(
     mock_client: MagicMock, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -136,7 +131,6 @@ async def test_show_config_missing(
     assert "problem retrieving" in capsys.readouterr().out
 
 
-@pytest.mark.asyncio
 async def test_show_detailed_config(
     mock_client: MagicMock, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -144,7 +138,6 @@ async def test_show_detailed_config(
     assert "Living Room" in capsys.readouterr().out
 
 
-@pytest.mark.asyncio
 async def test_show_detailed_config_missing(
     mock_client: MagicMock, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -153,7 +146,6 @@ async def test_show_detailed_config_missing(
     assert "problem retrieving" in capsys.readouterr().out
 
 
-@pytest.mark.asyncio
 async def test_show_current_activity_named(
     mock_client: MagicMock, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -161,7 +153,6 @@ async def test_show_current_activity_named(
     assert "Watch TV" in capsys.readouterr().out
 
 
-@pytest.mark.asyncio
 async def test_show_current_activity_id_only(
     mock_client: MagicMock, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -170,7 +161,6 @@ async def test_show_current_activity_id_only(
     assert "activity_id" in capsys.readouterr().out
 
 
-@pytest.mark.asyncio
 async def test_show_current_activity_missing(
     mock_client: MagicMock, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -179,7 +169,6 @@ async def test_show_current_activity_missing(
     assert "Unable to retrieve" in capsys.readouterr().out
 
 
-@pytest.mark.asyncio
 async def test_start_activity_no_activity(
     mock_client: MagicMock, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -187,7 +176,6 @@ async def test_start_activity_no_activity(
     assert "No activity provided" in capsys.readouterr().out
 
 
-@pytest.mark.asyncio
 async def test_start_activity_numeric_id(
     mock_client: MagicMock, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -196,7 +184,6 @@ async def test_start_activity_numeric_id(
     assert "Started Activity" in capsys.readouterr().out
 
 
-@pytest.mark.asyncio
 async def test_start_activity_named(
     mock_client: MagicMock, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -206,7 +193,6 @@ async def test_start_activity_named(
     assert "Found activity named" in capsys.readouterr().out
 
 
-@pytest.mark.asyncio
 async def test_start_activity_invalid(
     mock_client: MagicMock, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -215,7 +201,6 @@ async def test_start_activity_invalid(
     assert "Invalid activity" in capsys.readouterr().out
 
 
-@pytest.mark.asyncio
 async def test_start_activity_failed(
     mock_client: MagicMock, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -224,13 +209,11 @@ async def test_start_activity_failed(
     assert "Activity start failed" in capsys.readouterr().out
 
 
-@pytest.mark.asyncio
 async def test_start_activity_power_off_id(mock_client: MagicMock) -> None:
     await cli.start_activity(mock_client, _make_args(activity="-1"))
     mock_client.start_activity.assert_awaited_with("-1")
 
 
-@pytest.mark.asyncio
 async def test_power_off_ok(
     mock_client: MagicMock, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -238,7 +221,6 @@ async def test_power_off_ok(
     assert "Powered Off" in capsys.readouterr().out
 
 
-@pytest.mark.asyncio
 async def test_power_off_failed(
     mock_client: MagicMock, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -247,7 +229,6 @@ async def test_power_off_failed(
     assert "Power off failed" in capsys.readouterr().out
 
 
-@pytest.mark.asyncio
 async def test_change_channel_ok(
     mock_client: MagicMock, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -256,7 +237,6 @@ async def test_change_channel_ok(
     assert "Changed to channel 7" in capsys.readouterr().out
 
 
-@pytest.mark.asyncio
 async def test_change_channel_failed(
     mock_client: MagicMock, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -265,7 +245,6 @@ async def test_change_channel_failed(
     assert "Change to channel 7 failed" in capsys.readouterr().out
 
 
-@pytest.mark.asyncio
 async def test_sync_ok(
     mock_client: MagicMock, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -273,7 +252,6 @@ async def test_sync_ok(
     assert "Sync complete" in capsys.readouterr().out
 
 
-@pytest.mark.asyncio
 async def test_sync_failed(
     mock_client: MagicMock, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -282,7 +260,6 @@ async def test_sync_failed(
     assert "Sync failed" in capsys.readouterr().out
 
 
-@pytest.mark.asyncio
 async def test_just_listen_registers_handler(
     mock_client: MagicMock, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -291,13 +268,11 @@ async def test_just_listen_registers_handler(
     assert "Starting to listen" in capsys.readouterr().out
 
 
-@pytest.mark.asyncio
 async def test_just_listen_skips_when_already_showing(mock_client: MagicMock) -> None:
     await cli.just_listen(mock_client, _make_args(show_responses=True))
     mock_client.register_handler.assert_not_called()
 
 
-@pytest.mark.asyncio
 async def test_just_listen_callback_prints_message(
     mock_client: MagicMock, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -308,7 +283,6 @@ async def test_just_listen_callback_prints_message(
     assert "hello-world" in capsys.readouterr().out
 
 
-@pytest.mark.asyncio
 async def test_listen_for_new_activities_starting(
     mock_client: MagicMock, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -325,7 +299,6 @@ async def test_listen_for_new_activities_starting(
     assert "Powering off completed" in out
 
 
-@pytest.mark.asyncio
 async def test_send_command_with_named_device(
     mock_client: MagicMock, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -337,14 +310,12 @@ async def test_send_command_with_named_device(
     assert "Command Sent" in capsys.readouterr().out
 
 
-@pytest.mark.asyncio
 async def test_send_command_numeric_known_device(mock_client: MagicMock) -> None:
     mock_client.get_device_name.return_value = "TV"
     await cli.send_command(mock_client, _make_args(device_id="42", command="Play"))
     mock_client.send_commands.assert_awaited()
 
 
-@pytest.mark.asyncio
 async def test_send_command_invalid_device(
     mock_client: MagicMock, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -355,7 +326,6 @@ async def test_send_command_invalid_device(
     mock_client.send_commands.assert_not_called()
 
 
-@pytest.mark.asyncio
 async def test_send_command_repeats_with_delay(mock_client: MagicMock) -> None:
     await cli.send_command(
         mock_client,
@@ -365,7 +335,6 @@ async def test_send_command_repeats_with_delay(mock_client: MagicMock) -> None:
     assert len(sent) == 6
 
 
-@pytest.mark.asyncio
 async def test_send_command_reports_failures(
     mock_client: MagicMock, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -376,7 +345,6 @@ async def test_send_command_reports_failures(
     assert "failed with code 500" in capsys.readouterr().out
 
 
-@pytest.mark.asyncio
 async def test_send_commands_split(
     mock_client: MagicMock, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -388,7 +356,6 @@ async def test_send_commands_split(
     assert "Commands Sent" in capsys.readouterr().out
 
 
-@pytest.mark.asyncio
 async def test_send_commands_with_delay(mock_client: MagicMock) -> None:
     await cli.send_commands(
         mock_client,
@@ -398,7 +365,6 @@ async def test_send_commands_with_delay(mock_client: MagicMock) -> None:
     assert len(sent) == 4
 
 
-@pytest.mark.asyncio
 async def test_send_commands_invalid_device(
     mock_client: MagicMock, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -408,7 +374,6 @@ async def test_send_commands_invalid_device(
     assert "is invalid" in capsys.readouterr().out
 
 
-@pytest.mark.asyncio
 async def test_send_commands_reports_failures(
     mock_client: MagicMock, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -419,7 +384,6 @@ async def test_send_commands_reports_failures(
     assert "failed with code 500" in capsys.readouterr().out
 
 
-@pytest.mark.asyncio
 async def test_execute_per_hub_executes_provided_func(
     monkeypatch: pytest.MonkeyPatch, mock_client: MagicMock
 ) -> None:
@@ -434,7 +398,6 @@ async def test_execute_per_hub_executes_provided_func(
     mock_client.close.assert_awaited()
 
 
-@pytest.mark.asyncio
 async def test_execute_per_hub_get_client_returns_none(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -442,7 +405,6 @@ async def test_execute_per_hub_get_client_returns_none(
     await cli.execute_per_hub("10.0.0.5", _make_args(wait=0))
 
 
-@pytest.mark.asyncio
 async def test_execute_per_hub_get_client_timeout(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -452,7 +414,6 @@ async def test_execute_per_hub_get_client_timeout(
     await cli.execute_per_hub("10.0.0.5", _make_args(wait=0))
 
 
-@pytest.mark.asyncio
 async def test_execute_per_hub_func_timeout_swallowed(
     monkeypatch: pytest.MonkeyPatch, mock_client: MagicMock
 ) -> None:
@@ -467,7 +428,6 @@ async def test_execute_per_hub_func_timeout_swallowed(
     mock_client.close.assert_awaited()
 
 
-@pytest.mark.asyncio
 async def test_execute_per_hub_close_timeout_swallowed(
     monkeypatch: pytest.MonkeyPatch, mock_client: MagicMock
 ) -> None:
@@ -476,7 +436,6 @@ async def test_execute_per_hub_close_timeout_swallowed(
     await cli.execute_per_hub("10.0.0.5", _make_args(wait=0))
 
 
-@pytest.mark.asyncio
 async def test_execute_per_hub_no_func_attr_just_waits(
     monkeypatch: pytest.MonkeyPatch, mock_client: MagicMock
 ) -> None:
@@ -485,7 +444,6 @@ async def test_execute_per_hub_no_func_attr_just_waits(
     mock_client.close.assert_awaited()
 
 
-@pytest.mark.asyncio
 async def test_run_invalid_wait(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -497,13 +455,11 @@ async def test_run_invalid_wait(
     assert "Invalid value provided for --wait" in capsys.readouterr().out
 
 
-@pytest.mark.asyncio
 async def test_run_discover_branch_returns(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("sys.argv", ["aioharmony", "--discover"])
     await cli.run()
 
 
-@pytest.mark.asyncio
 async def test_run_no_func_prints_help(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
@@ -512,7 +468,6 @@ async def test_run_no_func_prints_help(
     assert "usage:" in capsys.readouterr().out.lower()
 
 
-@pytest.mark.asyncio
 async def test_run_with_logmodules(monkeypatch: pytest.MonkeyPatch) -> None:
     called: dict[str, object] = {}
 
@@ -538,7 +493,6 @@ async def test_run_with_logmodules(monkeypatch: pytest.MonkeyPatch) -> None:
     assert called["hub"] == "10.0.0.5"
 
 
-@pytest.mark.asyncio
 async def test_run_dispatches_per_hub(monkeypatch: pytest.MonkeyPatch) -> None:
     seen: list[str] = []
 
@@ -559,7 +513,6 @@ async def test_run_dispatches_per_hub(monkeypatch: pytest.MonkeyPatch) -> None:
     assert seen == ["10.0.0.5", "10.0.0.6"]
 
 
-@pytest.mark.asyncio
 async def test_run_reraises_exception(monkeypatch: pytest.MonkeyPatch) -> None:
     class CustomError(Exception):
         """Local error so the matcher is unambiguous."""
