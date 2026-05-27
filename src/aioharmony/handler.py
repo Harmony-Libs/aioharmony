@@ -52,14 +52,13 @@ class Handler:
 
     """
 
-    # pylint: disable=too-many-arguments
     def __init__(
         self,
         handler_obj: CallbackType,
-        handler_name: str = None,
-        resp_json: dict = None,
+        handler_name: str | None = None,
+        resp_json: dict | None = None,
         once: bool = True,
-        expiration: timedelta = None,
+        expiration: timedelta | None = None,
     ) -> None:
         self._handler_obj = handler_obj
         self._handler_name = handler_name
@@ -67,11 +66,11 @@ class Handler:
         self._once = once
         self._expiration = expiration
 
-    def __copy__(self):
+    def __copy__(self) -> "Handler":
         return Handler(
             handler_obj=self._handler_obj,
             handler_name=self._handler_name,
-            resp_json=self._resp_json.copy(),
+            resp_json=self._resp_json.copy() if self._resp_json is not None else None,
             once=self._once,
             expiration=self._expiration,
         )
@@ -85,19 +84,19 @@ class Handler:
         self._handler_obj = value
 
     @property
-    def handler_name(self) -> str:
+    def handler_name(self) -> str | None:
         return self._handler_name
 
     @handler_name.setter
-    def handler_name(self, value: str) -> None:
+    def handler_name(self, value: str | None) -> None:
         self._handler_name = value
 
     @property
-    def resp_json(self) -> dict:
+    def resp_json(self) -> dict | None:
         return self._resp_json
 
     @resp_json.setter
-    def resp_json(self, value: dict) -> None:
+    def resp_json(self, value: dict | None) -> None:
         self._resp_json = value
 
     @property
@@ -109,11 +108,11 @@ class Handler:
         self._once = value
 
     @property
-    def expiration(self) -> timedelta:
+    def expiration(self) -> timedelta | None:
         return self._expiration
 
     @expiration.setter
-    def expiration(self, value: timedelta) -> None:
+    def expiration(self, value: timedelta | None) -> None:
         self._expiration = value
 
 
@@ -134,42 +133,6 @@ HANDLER_NOTIFY = Handler(
     handler_obj=dummy_callback,
     handler_name="Notification_Received",
     resp_json={"type": re.compile(r"^connect\.stateDigest\?notify$")},
-    once=False,
-)
-
-HANDLER_START_ACTIVITY_NOTIFY_STARTED = Handler(
-    handler_obj=dummy_callback,
-    handler_name="Activity_Starting",
-    resp_json={
-        "type": re.compile(r"^connect\.stateDigest\?notify$"),
-        "data": {
-            "activityStatus": 1,
-        },
-    },
-    once=False,
-)
-
-HANDLER_STOP_ACTIVITY_NOTIFY_STARTED = Handler(
-    handler_obj=dummy_callback,
-    handler_name="Activity_Stopping",
-    resp_json={
-        "type": re.compile(r"^connect\.stateDigest\?notify$"),
-        "data": {
-            "activityStatus": 0,
-        },
-    },
-    once=False,
-)
-
-HANDLER_START_ACTIVITY_NOTIFY_INPROGRESS = Handler(
-    handler_obj=dummy_callback,
-    handler_name="Activity_Starting_Inprogress",
-    resp_json={
-        "type": re.compile(r"^connect\.stateDigest\?notify$"),
-        "data": {
-            "activityStatus": 2,
-        },
-    },
     once=False,
 )
 
