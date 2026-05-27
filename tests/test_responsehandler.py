@@ -10,7 +10,6 @@ from collections.abc import AsyncIterator, Callable
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-import pytest
 import pytest_asyncio
 
 from aioharmony.handler import Handler
