@@ -43,7 +43,6 @@ def test_call_callback_logs_when_raw_returns_false(
     assert "named was not called" in caplog.text
 
 
-@pytest.mark.asyncio
 async def test_call_raw_callback_with_future() -> None:
     loop = asyncio.get_running_loop()
     fut: asyncio.Future = loop.create_future()
@@ -52,7 +51,6 @@ async def test_call_raw_callback_with_future() -> None:
     assert fut.result() == "value"
 
 
-@pytest.mark.asyncio
 async def test_call_raw_callback_with_already_done_future() -> None:
     """A future that already has a result is left untouched."""
     loop = asyncio.get_running_loop()
@@ -62,14 +60,12 @@ async def test_call_raw_callback_with_already_done_future() -> None:
     assert fut.result() == "original"
 
 
-@pytest.mark.asyncio
 async def test_call_raw_callback_with_event() -> None:
     event = asyncio.Event()
     assert call_raw_callback(callback=event) is True
     assert event.is_set()
 
 
-@pytest.mark.asyncio
 async def test_call_raw_callback_with_coroutine_function() -> None:
     seen: list[object] = []
 

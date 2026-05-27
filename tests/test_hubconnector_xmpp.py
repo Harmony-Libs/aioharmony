@@ -40,7 +40,6 @@ def fast_sleep(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr("aioharmony.hubconnector_xmpp.asyncio.sleep", _no_sleep)
 
 
-@pytest.mark.asyncio
 async def test_hub_connect_uses_modern_slixmpp_kwargs() -> None:
     """hub_connect must call ClientXMPP.connect with host=/port=.
 
@@ -70,7 +69,6 @@ async def test_hub_connect_uses_modern_slixmpp_kwargs() -> None:
     await hub.hub_disconnect()
 
 
-@pytest.mark.asyncio
 async def test_hub_connect_short_circuits_when_already_connected() -> None:
     """hub_connect returns True without calling slixmpp when already connected."""
     hub = _make_hub()
@@ -83,7 +81,6 @@ async def test_hub_connect_short_circuits_when_already_connected() -> None:
     connect_mock.assert_not_called()
 
 
-@pytest.mark.asyncio
 async def test_hub_connect_returns_false_on_iqtimeout() -> None:
     """An IqTimeout from slixmpp.connect leaves us disconnected and returns False."""
     hub = _make_hub()
@@ -95,7 +92,6 @@ async def test_hub_connect_returns_false_on_iqtimeout() -> None:
     assert hub._connected is False  # noqa: SLF001
 
 
-@pytest.mark.asyncio
 async def test_hub_connect_returns_false_on_oserror() -> None:
     """OSError during the connected-future wait is logged and returns False."""
     hub = _make_hub()
@@ -111,7 +107,6 @@ async def test_hub_connect_returns_false_on_oserror() -> None:
     assert hub._connected is False  # noqa: SLF001
 
 
-@pytest.mark.asyncio
 async def test_hub_disconnect_is_noop_when_not_connected() -> None:
     """hub_disconnect must exit early if there is nothing to tear down."""
     hub = _make_hub()
@@ -120,7 +115,6 @@ async def test_hub_disconnect_is_noop_when_not_connected() -> None:
     disconnect_mock.assert_not_called()
 
 
-@pytest.mark.asyncio
 async def test_hub_disconnect_drives_disconnected_future() -> None:
     """hub_disconnect resolves once slixmpp fires the 'disconnected' event."""
     hub = _make_hub()
@@ -136,7 +130,6 @@ async def test_hub_disconnect_drives_disconnected_future() -> None:
     assert hub._connected is False  # noqa: SLF001
 
 
-@pytest.mark.asyncio
 async def test_hub_disconnect_raises_timeout_when_event_never_fires(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -155,7 +148,6 @@ async def test_hub_disconnect_raises_timeout_when_event_never_fires(
         await hub.hub_disconnect()
 
 
-@pytest.mark.asyncio
 async def test_close_calls_hub_disconnect() -> None:
     """close() must funnel through hub_disconnect."""
     hub = _make_hub()
@@ -169,7 +161,6 @@ async def test_close_calls_hub_disconnect() -> None:
     assert fake_hub_disconnect.called is True  # type: ignore[attr-defined]
 
 
-@pytest.mark.asyncio
 async def test_connected_handler_sets_flag_and_fires_callback() -> None:
     """_connected_handler flips _connected and invokes the connect callback."""
     seen: list[str] = []
@@ -184,7 +175,6 @@ async def test_connected_handler_sets_flag_and_fires_callback() -> None:
     assert seen == ["10.0.0.42"]
 
 
-@pytest.mark.asyncio
 async def test_disconnected_handler_returns_when_not_connected() -> None:
     """If _connected is False (user disconnected), no reconnect is attempted."""
     seen: list[str] = []
@@ -197,7 +187,6 @@ async def test_disconnected_handler_returns_when_not_connected() -> None:
     assert seen == ["10.0.0.42"]
 
 
-@pytest.mark.asyncio
 async def test_disconnected_handler_returns_when_auto_reconnect_disabled() -> None:
     """auto_reconnect=False must suppress reconnect even if we were connected."""
     hub = _make_hub(auto_reconnect=False)
@@ -209,7 +198,6 @@ async def test_disconnected_handler_returns_when_auto_reconnect_disabled() -> No
     hub_connect.assert_not_called()
 
 
-@pytest.mark.asyncio
 async def test_disconnected_handler_reconnects_on_first_attempt() -> None:
     """The retry loop exits as soon as hub_connect returns True."""
     hub = _make_hub()
@@ -232,7 +220,6 @@ async def test_disconnected_handler_reconnects_on_first_attempt() -> None:
     hub._init_super.assert_called_once()  # noqa: SLF001
 
 
-@pytest.mark.asyncio
 async def test_disconnected_handler_retries_after_iqtimeout_and_failure() -> None:
     """IqTimeout and False both retry; success on the third attempt exits."""
     hub = _make_hub()
@@ -257,7 +244,6 @@ async def test_disconnected_handler_retries_after_iqtimeout_and_failure() -> Non
     assert flags == [False, True, True]
 
 
-@pytest.mark.asyncio
 async def test_disconnected_handler_stops_when_disconnect_requested_mid_reconnect() -> (
     None
 ):
@@ -281,7 +267,6 @@ async def test_disconnected_handler_stops_when_disconnect_requested_mid_reconnec
     assert flags == [False]
 
 
-@pytest.mark.asyncio
 async def test_disconnected_handler_stops_when_auto_reconnect_cleared_mid_reconnect() -> (
     None
 ):
@@ -305,7 +290,6 @@ async def test_disconnected_handler_stops_when_auto_reconnect_cleared_mid_reconn
     assert flags == [False]
 
 
-@pytest.mark.asyncio
 async def test_disconnected_handler_backoff_sequence(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -334,7 +318,6 @@ async def test_disconnected_handler_backoff_sequence(
     assert delays == [1, 1, 2, 4]
 
 
-@pytest.mark.asyncio
 async def test_disconnected_handler_stops_before_backoff_when_disconnect_mid_connect(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -362,7 +345,6 @@ async def test_disconnected_handler_stops_before_backoff_when_disconnect_mid_con
     assert delays == [1]
 
 
-@pytest.mark.asyncio
 async def test_disconnected_handler_stops_at_loop_top_when_disconnect_before_attempt(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -392,7 +374,6 @@ async def test_disconnected_handler_stops_at_loop_top_when_disconnect_before_att
     assert flags == []
 
 
-@pytest.mark.asyncio
 async def test_hub_disconnect_sets_disconnect_requested_flag() -> None:
     """hub_disconnect records intent even when nothing is connected."""
     hub = _make_hub()
@@ -402,7 +383,6 @@ async def test_hub_disconnect_sets_disconnect_requested_flag() -> None:
     assert hub._disconnect_requested is True  # noqa: SLF001
 
 
-@pytest.mark.asyncio
 async def test_hub_connect_clears_disconnect_requested_on_success() -> None:
     """A successful connect resets the disconnect-requested flag."""
     hub = _make_hub()
@@ -420,7 +400,6 @@ async def test_hub_connect_clears_disconnect_requested_on_success() -> None:
     await hub.hub_disconnect()
 
 
-@pytest.mark.asyncio
 async def test_listener_message_received_parses_json() -> None:
     """JSON payloads land in the response queue as a dict."""
     hub = _make_hub()
@@ -442,7 +421,6 @@ async def test_listener_message_received_parses_json() -> None:
     assert response["code"] == 0
 
 
-@pytest.mark.asyncio
 async def test_listener_message_received_falls_back_to_key_value_pairs() -> None:
     """Non-JSON `key=value:key=value` payloads still parse into a dict."""
     hub = _make_hub()
@@ -461,7 +439,6 @@ async def test_listener_message_received_falls_back_to_key_value_pairs() -> None
     assert response["data"] == {"status": "running", "remoteId": "abc"}
 
 
-@pytest.mark.asyncio
 async def test_listener_message_received_handles_empty_payload() -> None:
     """An empty payload list logs and drops the message without queueing."""
     hub = _make_hub()
@@ -474,7 +451,6 @@ async def test_listener_message_received_handles_empty_payload() -> None:
     assert hub._response_queue.empty()  # noqa: SLF001
 
 
-@pytest.mark.asyncio
 async def test_listener_message_received_handles_errorcode_attrib() -> None:
     """A non-zero errorcode propagates through to the response dict."""
     hub = _make_hub()
@@ -501,7 +477,6 @@ async def test_listener_message_received_handles_errorcode_attrib() -> None:
     assert response["data"] == {}
 
 
-@pytest.mark.asyncio
 async def test_hub_send_returns_none_when_connect_fails() -> None:
     """hub_send bails out if hub_connect cannot establish a session."""
     hub = _make_hub()
@@ -514,7 +489,6 @@ async def test_hub_send_returns_none_when_connect_fails() -> None:
     assert result is None
 
 
-@pytest.mark.asyncio
 @pytest.mark.parametrize(
     ("iq_type", "factory"),
     [
@@ -549,7 +523,6 @@ async def test_hub_send_builds_payload_for_iq_type(iq_type: str, factory: str) -
     iq_stanza.send.assert_called_once_with(timeout=1)
 
 
-@pytest.mark.asyncio
 async def test_hub_send_error_iq_passes_msgid_as_id_kwarg() -> None:
     """The 'error' branch uses make_iq_error(id=msgid) — verify the kwarg."""
     hub = _make_hub()
@@ -572,7 +545,6 @@ async def test_hub_send_error_iq_passes_msgid_as_id_kwarg() -> None:
     make_iq_error.assert_called_once_with(id=msgid)
 
 
-@pytest.mark.asyncio
 async def test_hub_send_joins_multiple_params_with_colon() -> None:
     """Multiple params serialize as `k1=v1:k2=v2` in payload text."""
     hub = _make_hub()
@@ -600,7 +572,6 @@ async def test_hub_send_joins_multiple_params_with_colon() -> None:
     assert captured_payload["text"] == "a=1:b=2"
 
 
-@pytest.mark.asyncio
 async def test_callbacks_setter_replaces_callbacks() -> None:
     """The callbacks property round-trips a fresh ConnectorCallbackType."""
     hub = _make_hub()

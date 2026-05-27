@@ -10,7 +10,6 @@ from collections.abc import AsyncIterator, Callable
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-import pytest
 import pytest_asyncio
 
 from aioharmony.handler import Handler
@@ -52,7 +51,6 @@ def _make_handler(
     )
 
 
-@pytest.mark.asyncio
 async def test_register_handler_returns_uuid(
     rh_pair: tuple[ResponseHandler, asyncio.Queue],
 ) -> None:
@@ -63,7 +61,6 @@ async def test_register_handler_returns_uuid(
     assert len(handler_uuid) == 36  # uuid4 string
 
 
-@pytest.mark.asyncio
 async def test_unregister_handler_removes_entry(
     rh_pair: tuple[ResponseHandler, asyncio.Queue],
 ) -> None:
@@ -73,7 +70,6 @@ async def test_unregister_handler_removes_entry(
     assert rh.unregister_handler(handler_uuid) is False
 
 
-@pytest.mark.asyncio
 async def test_unregister_unknown_uuid_returns_false(
     rh_pair: tuple[ResponseHandler, asyncio.Queue],
 ) -> None:
@@ -81,7 +77,6 @@ async def test_unregister_unknown_uuid_returns_false(
     assert rh.unregister_handler("does-not-exist") is False
 
 
-@pytest.mark.asyncio
 async def test_register_with_timedelta_expiration_fires_then_removed(
     rh_pair: tuple[ResponseHandler, asyncio.Queue],
 ) -> None:
@@ -97,7 +92,6 @@ async def test_register_with_timedelta_expiration_fires_then_removed(
     assert seen == [{"type": "x"}]
 
 
-@pytest.mark.asyncio
 async def test_register_with_naive_datetime_assumed_utc(
     rh_pair: tuple[ResponseHandler, asyncio.Queue],
 ) -> None:
@@ -114,7 +108,6 @@ async def test_register_with_naive_datetime_assumed_utc(
     assert seen == [{"type": "y"}]
 
 
-@pytest.mark.asyncio
 async def test_handler_expiration_overrides_handler_default(
     rh_pair: tuple[ResponseHandler, asyncio.Queue],
 ) -> None:
@@ -132,7 +125,6 @@ async def test_handler_expiration_overrides_handler_default(
     assert seen == []
 
 
-@pytest.mark.asyncio
 async def test_handler_matches_on_resp_json_pattern(
     rh_pair: tuple[ResponseHandler, asyncio.Queue],
 ) -> None:
@@ -152,7 +144,6 @@ async def test_handler_matches_on_resp_json_pattern(
     assert seen == [{"type": "foo.bar", "data": 1}]
 
 
-@pytest.mark.asyncio
 async def test_handler_msgid_filter(
     rh_pair: tuple[ResponseHandler, asyncio.Queue],
 ) -> None:
@@ -172,7 +163,6 @@ async def test_handler_msgid_filter(
     assert seen == [{"id": "abc-123", "payload": True}]
 
 
-@pytest.mark.asyncio
 async def test_handler_once_removed_after_fire(
     rh_pair: tuple[ResponseHandler, asyncio.Queue],
 ) -> None:
@@ -189,7 +179,6 @@ async def test_handler_once_removed_after_fire(
     assert seen == [{"type": "x", "n": 1}]
 
 
-@pytest.mark.asyncio
 async def test_handler_persistent_when_not_once(
     rh_pair: tuple[ResponseHandler, asyncio.Queue],
 ) -> None:
@@ -204,7 +193,6 @@ async def test_handler_persistent_when_not_once(
     assert seen == [{"type": "x", "n": 1}, {"type": "x", "n": 2}]
 
 
-@pytest.mark.asyncio
 async def test_handler_match_nested_dict_with_pattern(
     rh_pair: tuple[ResponseHandler, asyncio.Queue],
 ) -> None:
@@ -226,7 +214,6 @@ async def test_handler_match_nested_dict_with_pattern(
     assert seen == [{"type": "state", "data": {"activityStatus": 1}}]
 
 
-@pytest.mark.asyncio
 async def test_expired_handler_does_not_fire(
     rh_pair: tuple[ResponseHandler, asyncio.Queue],
 ) -> None:
@@ -242,7 +229,6 @@ async def test_expired_handler_does_not_fire(
     assert seen == []
 
 
-@pytest.mark.asyncio
 async def test_handler_no_match_when_type_differs(
     rh_pair: tuple[ResponseHandler, asyncio.Queue],
 ) -> None:
@@ -257,7 +243,6 @@ async def test_handler_no_match_when_type_differs(
     assert seen == []
 
 
-@pytest.mark.asyncio
 async def test_handler_no_match_when_key_missing(
     rh_pair: tuple[ResponseHandler, asyncio.Queue],
 ) -> None:
@@ -269,7 +254,6 @@ async def test_handler_no_match_when_key_missing(
     assert seen == []
 
 
-@pytest.mark.asyncio
 async def test_callback_exceptions_do_not_break_dispatch(
     rh_pair: tuple[ResponseHandler, asyncio.Queue],
 ) -> None:
@@ -291,7 +275,6 @@ async def test_callback_exceptions_do_not_break_dispatch(
     assert seen == [{"type": "x"}]
 
 
-@pytest.mark.asyncio
 async def test_close_stops_processing_messages(
     rh_pair: tuple[ResponseHandler, asyncio.Queue],
 ) -> None:

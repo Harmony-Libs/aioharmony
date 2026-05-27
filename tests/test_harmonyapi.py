@@ -229,7 +229,6 @@ def test_lookup_helpers_proxy(api: ApiFixture, fake_client: MagicMock) -> None:
     fake_client.get_device_name.assert_called_with(device_id="100")
 
 
-@pytest.mark.asyncio
 async def test_connect_close_proxy(api: ApiFixture, fake_client: MagicMock) -> None:
     instance, _ = api
     assert await instance.connect() is True
@@ -259,7 +258,6 @@ def test_register_and_unregister_handler_proxy(
     fake_client.unregister_handler.assert_called_once_with(handler_uuid="uuid-abc")
 
 
-@pytest.mark.asyncio
 async def test_sync_success(api: ApiFixture, fake_client: MagicMock) -> None:
     instance, _ = api
     fake_client.send_to_hub.return_value = {"code": 200}
@@ -270,7 +268,6 @@ async def test_sync_success(api: ApiFixture, fake_client: MagicMock) -> None:
     fake_client.refresh_info_from_hub.assert_awaited_once()
 
 
-@pytest.mark.asyncio
 async def test_sync_returns_false_when_no_response(
     api: ApiFixture, fake_client: MagicMock
 ) -> None:
@@ -281,7 +278,6 @@ async def test_sync_returns_false_when_no_response(
     fake_client.refresh_info_from_hub.assert_not_awaited()
 
 
-@pytest.mark.asyncio
 async def test_sync_returns_false_when_bad_code(
     api: ApiFixture, fake_client: MagicMock
 ) -> None:
@@ -292,7 +288,6 @@ async def test_sync_returns_false_when_bad_code(
     fake_client.refresh_info_from_hub.assert_not_awaited()
 
 
-@pytest.mark.asyncio
 async def test_start_activity_proxy(api: ApiFixture, fake_client: MagicMock) -> None:
     instance, _ = api
     fake_client.start_activity.return_value = (True, None, None)
@@ -300,7 +295,6 @@ async def test_start_activity_proxy(api: ApiFixture, fake_client: MagicMock) -> 
     fake_client.start_activity.assert_awaited_once_with(activity_id="42")
 
 
-@pytest.mark.asyncio
 async def test_send_commands_wraps_single_command(
     api: ApiFixture, fake_client: MagicMock
 ) -> None:
@@ -318,7 +312,6 @@ async def test_send_commands_wraps_single_command(
     assert sent_commands == [command]
 
 
-@pytest.mark.asyncio
 async def test_send_commands_passes_list_through(
     api: ApiFixture, fake_client: MagicMock
 ) -> None:
@@ -335,7 +328,6 @@ async def test_send_commands_passes_list_through(
     assert sent is commands
 
 
-@pytest.mark.asyncio
 async def test_power_off_returns_first_tuple_element(
     api: ApiFixture, fake_client: MagicMock
 ) -> None:
@@ -345,7 +337,6 @@ async def test_power_off_returns_first_tuple_element(
     fake_client.start_activity.assert_awaited_once_with(activity_id=-1)
 
 
-@pytest.mark.asyncio
 async def test_power_off_false_when_start_activity_fails(
     api: ApiFixture, fake_client: MagicMock
 ) -> None:
@@ -354,7 +345,6 @@ async def test_power_off_false_when_start_activity_fails(
     assert await instance.power_off() is False
 
 
-@pytest.mark.asyncio
 async def test_change_channel_success(api: ApiFixture, fake_client: MagicMock) -> None:
     instance, _ = api
     fake_client.send_to_hub.return_value = {"code": 200}
@@ -365,7 +355,6 @@ async def test_change_channel_success(api: ApiFixture, fake_client: MagicMock) -
     )
 
 
-@pytest.mark.asyncio
 async def test_change_channel_returns_false_on_empty_response(
     api: ApiFixture, fake_client: MagicMock
 ) -> None:
@@ -374,7 +363,6 @@ async def test_change_channel_returns_false_on_empty_response(
     assert await instance.change_channel(42) is False
 
 
-@pytest.mark.asyncio
 async def test_change_channel_returns_false_on_bad_code(
     api: ApiFixture, fake_client: MagicMock
 ) -> None:

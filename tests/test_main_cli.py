@@ -13,8 +13,6 @@ import pytest
 import aioharmony.__main__ as cli
 import aioharmony.exceptions as harmony_exceptions
 
-pytestmark = pytest.mark.asyncio
-
 
 @pytest.fixture(autouse=True)
 def _restore_root_logger() -> Iterator[None]:
