@@ -296,6 +296,22 @@ async def change_channel(client, args):
         print(f"HUB: {client.name} Change to channel {args.channel} failed")
 
 
+async def set_sleep_timer(client, args):
+    """Set the hub sleep timer.
+
+    Args:
+        args (argparse): Argparse object containing required variables from
+        command line
+
+    """
+    status = await client.set_sleep_timer(args.interval)
+
+    if status:
+        print(f"HUB: {client.name} Sleep timer set to {args.interval}")
+    else:
+        print(f"HUB: {client.name} Sleep timer set to {args.interval} failed")
+
+
 # def discover(args):
 #     hubs = harmony_discovery.discover()
 #     pprint(hubs)
@@ -532,6 +548,16 @@ async def run():
     )
     change_channel_parser.add_argument("--channel", help="Channel to switch to.")
     change_channel_parser.set_defaults(func=change_channel)
+
+    sleep_timer_parser = subparsers.add_parser(
+        "set_sleep_timer", help="Set the hub sleep timer"
+    )
+    sleep_timer_parser.add_argument(
+        "--interval",
+        type=int,
+        help="Sleep interval in seconds. 0 cancels the timer.",
+    )
+    sleep_timer_parser.set_defaults(func=set_sleep_timer)
 
     args = parser.parse_args()
 
