@@ -371,9 +371,7 @@ async def test_change_channel_returns_false_on_bad_code(
     assert await instance.change_channel(42) is False
 
 
-async def test_set_sleep_timer_success(
-    api: ApiFixture, fake_client: MagicMock
-) -> None:
+async def test_set_sleep_timer_success(api: ApiFixture, fake_client: MagicMock) -> None:
     instance, _ = api
     fake_client.send_to_hub.return_value = {"code": 200}
     assert await instance.set_sleep_timer(300) is True
