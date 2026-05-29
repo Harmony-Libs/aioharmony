@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import warnings
 from collections import deque
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
@@ -376,6 +377,33 @@ async def test_get_remote_id_handles_missing_hub_info() -> None:
     result = await connector.get_remote_id()
 
     assert result is None
+
+
+async def test_session_property_returns_cached_session() -> None:
+    """The _session property returns the cached session without recreating it."""
+    connector = _make_connector()
+    existing = MagicMock()
+    connector._aiohttp_session = existing  # noqa: SLF001
+
+    assert connector._session is existing  # noqa: SLF001
+
+
+async def test_session_property_builds_real_session_without_warnings() -> None:
+    """A fresh _session is a real aiohttp.ClientSession built without deprecation warnings."""
+    connector = _make_connector()
+    connector._aiohttp_session = None  # noqa: SLF001
+
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        session = connector._session  # noqa: SLF001
+
+    try:
+        assert isinstance(session, aiohttp.ClientSession)
+        assert connector._aiohttp_session is session  # noqa: SLF001
+        deprecations = [w for w in caught if issubclass(w.category, DeprecationWarning)]
+        assert not deprecations, [str(w.message) for w in deprecations]
+    finally:
+        await session.close()
 
 
 async def test_async_close_session_noop_when_none() -> None:

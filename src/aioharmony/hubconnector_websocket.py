@@ -18,6 +18,14 @@ from aioharmony.helpers import call_callback
 
 from .json import json_dumps, json_loads
 
+# aiohttp 3.11.10+ exposes NEEDS_CLEANUP_CLOSED so callers can suppress the
+# `enable_cleanup_closed` deprecation warning on Python builds where the
+# underlying cpython transport-close leak is already fixed (3.12.7+/3.13+).
+try:
+    from aiohttp.connector import NEEDS_CLEANUP_CLOSED
+except ImportError:  # pragma: no cover - aiohttp <3.11.10
+    NEEDS_CLEANUP_CLOSED = True
+
 DEFAULT_DOMAIN = "svcs.myharmony.com"
 DEFAULT_TIMEOUT = 5
 
@@ -97,9 +105,9 @@ class HubConnector:
         # Specify socket
         conn = aiohttp.TCPConnector(
             family=socket.AF_INET,
-            verify_ssl=False,
+            ssl=False,
             force_close=True,
-            enable_cleanup_closed=True,
+            enable_cleanup_closed=NEEDS_CLEANUP_CLOSED,
         )
 
         session_timeout = aiohttp.ClientTimeout(connect=DEFAULT_TIMEOUT)
