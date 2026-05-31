@@ -107,6 +107,56 @@ async def test_hub_connect_returns_false_on_oserror() -> None:
     assert hub._connected is False  # noqa: SLF001
 
 
+async def test_hub_connect_raises_timeout_on_connection_timeout() -> None:
+    """TimeoutError on the connected-future maps to aioharmony's TimeOut."""
+    hub = _make_hub()
+
+    def fake_connect(self: slixmpp.ClientXMPP, *args: object, **kwargs: object) -> None:
+        loop = asyncio.get_running_loop()
+        loop.call_soon(self.event, "connection_failed", TimeoutError())
+
+    with (
+        patch.object(slixmpp.ClientXMPP, "connect", fake_connect),
+        pytest.raises(aioexc.TimeOut),
+    ):
+        await hub.hub_connect()
+
+    assert hub._connected is False  # noqa: SLF001
+
+
+async def test_hub_connect_returns_false_on_stray_cancellederror() -> None:
+    """A CancelledError that isn't a real task-cancel returns False, no raise."""
+    hub = _make_hub()
+
+    def fake_connect(self: slixmpp.ClientXMPP, *args: object, **kwargs: object) -> None:
+        loop = asyncio.get_running_loop()
+        loop.call_soon(self.event, "connection_failed", asyncio.CancelledError())
+
+    with patch.object(slixmpp.ClientXMPP, "connect", fake_connect):
+        result = await hub.hub_connect()
+
+    assert result is False
+    assert hub._connected is False  # noqa: SLF001
+
+
+async def test_hub_connect_reraises_when_task_is_being_cancelled() -> None:
+    """If the surrounding task was cancelled, CancelledError propagates."""
+    hub = _make_hub()
+
+    def fake_connect(self: slixmpp.ClientXMPP, *args: object, **kwargs: object) -> None:
+        task = asyncio.current_task()
+        assert task is not None
+        task.cancel()
+
+    with (
+        patch.object(slixmpp.ClientXMPP, "connect", fake_connect),
+        pytest.raises(asyncio.CancelledError),
+    ):
+        await hub.hub_connect()
+
+    assert hub._connected is False  # noqa: SLF001
+
+
 async def test_hub_disconnect_is_noop_when_not_connected() -> None:
     """hub_disconnect must exit early if there is nothing to tear down."""
     hub = _make_hub()
