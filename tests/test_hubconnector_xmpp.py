@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import sys
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -139,6 +140,10 @@ async def test_hub_connect_returns_false_on_stray_cancellederror() -> None:
     assert hub._connected is False  # noqa: SLF001
 
 
+@pytest.mark.skipif(
+    sys.version_info < (3, 11),
+    reason="task.cancelling() requires Python 3.11+; production code guards the re-raise",
+)
 async def test_hub_connect_reraises_when_task_is_being_cancelled() -> None:
     """If the surrounding task was cancelled, CancelledError propagates."""
     hub = _make_hub()
