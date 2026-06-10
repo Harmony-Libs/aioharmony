@@ -448,9 +448,7 @@ async def test_execute_per_hub_negative_wait_blocks_until_cancelled(
     monkeypatch: pytest.MonkeyPatch, mock_client: MagicMock
 ) -> None:
     monkeypatch.setattr(cli, "get_client", AsyncMock(return_value=mock_client))
-    task = asyncio.ensure_future(
-        cli.execute_per_hub("10.0.0.5", _make_args(wait=-1))
-    )
+    task = asyncio.ensure_future(cli.execute_per_hub("10.0.0.5", _make_args(wait=-1)))
     for _ in range(3):
         await asyncio.sleep(0)
     assert not task.done()
