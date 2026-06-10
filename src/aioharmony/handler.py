@@ -6,6 +6,7 @@ copy them instead.
 
 import re
 from datetime import timedelta
+from typing import Any
 
 from aioharmony.const import CallbackType
 
@@ -56,7 +57,7 @@ class Handler:
         self,
         handler_obj: CallbackType,
         handler_name: str | None = None,
-        resp_json: dict | None = None,
+        resp_json: dict[str, Any] | None = None,
         once: bool = True,
         expiration: timedelta | None = None,
     ) -> None:
@@ -92,11 +93,11 @@ class Handler:
         self._handler_name = value
 
     @property
-    def resp_json(self) -> dict | None:
+    def resp_json(self) -> dict[str, Any] | None:
         return self._resp_json
 
     @resp_json.setter
-    def resp_json(self, value: dict | None) -> None:
+    def resp_json(self, value: dict[str, Any] | None) -> None:
         self._resp_json = value
 
     @property
@@ -125,7 +126,7 @@ class Handler:
 #
 
 
-def dummy_callback(message):
+def dummy_callback(message: object) -> object:
     return message
 
 

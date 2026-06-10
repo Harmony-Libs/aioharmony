@@ -3,18 +3,20 @@
 import asyncio
 import logging
 import sys
+from collections.abc import Callable, Coroutine
 from functools import partial
+from typing import Any
 
-from aioharmony.handler import CallbackType
+from aioharmony.const import CallbackType
 
 _LOGGER = logging.getLogger(__name__)
 
-_CALLBACK_TASKS: set[asyncio.Task] = set()
+_CALLBACK_TASKS: set[asyncio.Task[Any]] = set()
 
 
 # pylint: disable=broad-except
 def call_callback(
-    callback_handler: CallbackType,
+    callback_handler: CallbackType | None,
     result: object,
     callback_uuid: str,
     callback_name: str,
@@ -48,8 +50,8 @@ def call_callback(
 def call_raw_callback(
     callback: CallbackType,
     result: object = None,
-    callback_uuid: str = None,
-    callback_name: str = None,
+    callback_uuid: str | None = None,
+    callback_name: str | None = None,
 ) -> bool:
     """Executes or sets the callback provided based on the type of callback:
       * Future : sets the result of the future to result provided
@@ -102,14 +104,17 @@ def call_raw_callback(
             "Scheduling coroutine %s with UUID %s", callback_name, callback_uuid
         )
 
-        def async_partial(async_fn, *args):
-            async def wrapped():
+        def async_partial(
+            async_fn: Callable[..., Coroutine[Any, Any, Any]], *args: Any
+        ) -> Callable[[], Coroutine[Any, Any, Any]]:
+            async def wrapped() -> Any:
                 return await async_fn(*args)
 
             return wrapped
 
         partial_func = async_partial(callback, result)
         loop = asyncio.get_running_loop()
+        task: asyncio.Task[Any]
         if sys.version_info >= (3, 12):
             # Optimization for Python 3.12, try to write
             # bytes immediately to avoid having to schedule
@@ -131,12 +136,16 @@ def call_raw_callback(
         func()
         return True
 
-    return False
+    # Defensive: CallbackType is exhausted above, so this is unreachable for a
+    # correctly typed callback. Kept as a runtime net for malformed input.
+    return False  # type: ignore[unreachable]
 
 
 def search_dict(
-    match_value: object = None, key: str = None, search_list: list[dict] = None
-) -> dict | None:
+    match_value: object = None,
+    key: str | None = None,
+    search_list: list[dict[str, Any]] | None = None,
+) -> dict[str, Any] | None:
     """Returns the 1st element in a list containing dictionaries
     where the value of key provided matches the value provided.
 
