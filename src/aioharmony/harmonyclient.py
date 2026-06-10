@@ -48,9 +48,9 @@ class HarmonyClient:
     def __init__(
         self,
         ip_address: str,
-        protocol: PROTOCOL = None,
-        callbacks: ClientCallbackType = None,
-        loop: asyncio.AbstractEventLoop = None,
+        protocol: PROTOCOL | None = None,
+        callbacks: ClientCallbackType | None = None,
+        loop: asyncio.AbstractEventLoop | None = None,
     ) -> None:
         _LOGGER.debug("%s: Initialize HUB", ip_address)
         self._ip_address = ip_address

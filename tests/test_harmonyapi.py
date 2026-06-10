@@ -288,6 +288,16 @@ async def test_sync_returns_false_when_bad_code(
     fake_client.refresh_info_from_hub.assert_not_awaited()
 
 
+async def test_sync_returns_false_when_response_is_bool(
+    api: ApiFixture, fake_client: MagicMock
+) -> None:
+    instance, _ = api
+    fake_client.send_to_hub.return_value = True
+
+    assert await instance.sync() is False
+    fake_client.refresh_info_from_hub.assert_not_awaited()
+
+
 async def test_start_activity_proxy(api: ApiFixture, fake_client: MagicMock) -> None:
     instance, _ = api
     fake_client.start_activity.return_value = (True, None, None)
@@ -368,4 +378,12 @@ async def test_change_channel_returns_false_on_bad_code(
 ) -> None:
     instance, _ = api
     fake_client.send_to_hub.return_value = {"code": 500}
+    assert await instance.change_channel(42) is False
+
+
+async def test_change_channel_returns_false_when_response_is_bool(
+    api: ApiFixture, fake_client: MagicMock
+) -> None:
+    instance, _ = api
+    fake_client.send_to_hub.return_value = True
     assert await instance.change_channel(42) is False
