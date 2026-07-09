@@ -549,7 +549,26 @@ async def test_hub_disconnect_closes_websocket_and_session() -> None:
     ws.close.assert_awaited_once()
     session.close.assert_awaited_once()
     assert connector._websocket is None  # noqa: SLF001
+    assert connector._aiohttp_session is None  # noqa: SLF001
     assert connector._connected is False  # noqa: SLF001
+
+
+async def test_hub_disconnect_allows_session_recreation() -> None:
+    """After disconnect the next _session access builds a fresh session."""
+    connector = _make_connector()
+    ws = MagicMock()
+    ws.close = AsyncMock()
+    session = MagicMock()
+    session.close = AsyncMock()
+    connector._websocket = ws  # noqa: SLF001
+    connector._aiohttp_session = session  # noqa: SLF001
+
+    await connector.hub_disconnect()
+
+    assert connector._aiohttp_session is None  # noqa: SLF001
+    new_session = connector._session  # noqa: SLF001
+    assert new_session is not session
+    await new_session.close()
 
 
 async def test_hub_disconnect_cancels_running_listener() -> None:

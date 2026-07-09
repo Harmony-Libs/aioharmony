@@ -223,7 +223,11 @@ class HubConnector:
                     async with timeout(DEFAULT_TIMEOUT):
                         await self._websocket.close()
 
-                await self._session.close()
+                # Close *and* drop the session. A bare self._session.close()
+                # leaves _aiohttp_session pointing at the now-closed session,
+                # so a later hub_connect() reuses it and ws_connect fails
+                # permanently for callers that keep the connector instance.
+                await self.async_close_session()
                 # Zero-sleep to allow underlying connections to close.
                 await asyncio.sleep(0)
 
