@@ -248,3 +248,20 @@ class HarmonyAPI:
             return False
 
         return response.get("code") == 200
+
+    async def set_sleep_timer(self, interval: int) -> bool:
+        """Set the hub sleep timer.
+
+        :param interval: Sleep interval in seconds. ``0`` cancels the timer.
+        :type interval: int
+        :return: True if the hub acknowledged the request, False otherwise.
+        :rtype: bool
+        """
+        _LOGGER.debug("%s: Setting sleep timer to %s seconds", self.name, interval)
+        response = await self._harmony_client.send_to_hub(
+            command="set_sleep_timer", params={"interval": interval}
+        )
+        if not response:
+            return False
+
+        return response.get("code") == 200
