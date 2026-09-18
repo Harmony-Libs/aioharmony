@@ -172,6 +172,24 @@ async def test_close_cancels_pending_connection_attempt() -> None:
     hub.hub_disconnect.assert_awaited_once()
 
 
+async def test_close_aborts_stream_opened_by_cancelled_connect() -> None:
+    """close() tears down a transport that never reached the connected state."""
+    hub = _make_hub()
+    hub.hub_disconnect = AsyncMock()  # type: ignore[method-assign]
+    hub.abort = MagicMock()  # type: ignore[method-assign]
+    hub.transport = MagicMock()
+    await hub.close()
+    hub.abort.assert_called_once()
+
+
+async def test_close_does_not_abort_without_transport() -> None:
+    hub = _make_hub()
+    hub.hub_disconnect = AsyncMock()  # type: ignore[method-assign]
+    hub.abort = MagicMock()  # type: ignore[method-assign]
+    await hub.close()
+    hub.abort.assert_not_called()
+
+
 async def test_init_does_not_load_system_certificates() -> None:
     """Constructing the connector must not touch the CA store on the loop."""
     with (

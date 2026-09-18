@@ -333,7 +333,9 @@ async def test_hub_post_logs_connection_errors_at_debug(
     """A refused or unreachable hub is a debug message, not a traceback."""
     connector = _make_connector()
     session = MagicMock()
-    session.post = MagicMock(side_effect=aiohttp.ClientConnectionError("refused"))
+    session.post = MagicMock(
+        side_effect=aiohttp.ClientConnectorError(MagicMock(), OSError("refused"))
+    )
     connector._aiohttp_session = session  # noqa: SLF001
 
     with caplog.at_level("DEBUG", logger="aioharmony.hubconnector_websocket"):
@@ -341,6 +343,21 @@ async def test_hub_post_logs_connection_errors_at_debug(
 
     assert not [r for r in caplog.records if r.levelname == "ERROR"]
     assert any("Unable to connect for post" in r.message for r in caplog.records)
+
+
+async def test_hub_post_keeps_error_level_for_mid_request_failures(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A server dropping an in-flight post is still an error."""
+    connector = _make_connector()
+    session = MagicMock()
+    session.post = MagicMock(side_effect=aiohttp.ServerDisconnectedError())
+    connector._aiohttp_session = session  # noqa: SLF001
+
+    with caplog.at_level("DEBUG", logger="aioharmony.hubconnector_websocket"):
+        assert await connector.hub_post("http://10.0.0.1:8088/", {}) is None
+
+    assert any(r.levelname == "ERROR" for r in caplog.records)
 
 
 async def test_get_remote_id_returns_cached_value() -> None:

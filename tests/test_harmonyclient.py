@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import subprocess
 import sys
 from collections.abc import AsyncGenerator
@@ -279,7 +280,7 @@ def _fake_connector(hub_connect: AsyncMock) -> MagicMock:
 
 
 def _hanging(release: asyncio.Event | None = None, result: bool = True) -> AsyncMock:
-    async def _wait() -> bool:
+    async def _wait(**_kwargs: Any) -> bool:
         await (release or asyncio.Event()).wait()
         return result
 
@@ -395,7 +396,7 @@ async def test_connect_transport_prefers_websockets_when_both_succeed(
     release = asyncio.Event()
     ws = _fake_connector(_hanging(release))
 
-    async def _xmpp_connects() -> bool:
+    async def _xmpp_connects(**_kwargs: Any) -> bool:
         release.set()
         return True
 
@@ -406,6 +407,69 @@ async def test_connect_transport_prefers_websockets_when_both_succeed(
     assert client.protocol == WEBSOCKETS
     xmpp.close.assert_awaited_once()
     assert not isinstance(xmpp.callbacks, ConnectorCallbackType)
+
+
+async def test_connect_transport_races_quietly_and_reports_total_failure(
+    client: HarmonyClient,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    ws = _fake_connector(AsyncMock(return_value=False))
+    xmpp = _fake_connector(AsyncMock(return_value=False))
+    ws_cls, xmpp_cls, delay = _patch_connectors(ws, xmpp)
+    with ws_cls, xmpp_cls, delay, caplog.at_level("DEBUG", "aioharmony"):
+        assert await client._connect_transport() is False  # noqa: SLF001
+    ws.hub_connect.assert_awaited_once_with(is_reconnect=True)
+    xmpp.hub_connect.assert_awaited_once_with(is_reconnect=True)
+    errors = [r for r in caplog.records if r.levelno >= logging.ERROR]
+    assert len(errors) == 1
+    assert "WEBSOCKETS or XMPP" in errors[0].message
+
+
+async def test_connect_transport_survives_unexpected_exception_in_one_attempt(
+    client: HarmonyClient,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    ws = _fake_connector(AsyncMock(side_effect=RuntimeError("boom")))
+    xmpp = _fake_connector(AsyncMock(return_value=True))
+    ws_cls, xmpp_cls, delay = _patch_connectors(ws, xmpp)
+    with ws_cls, xmpp_cls, delay, caplog.at_level("ERROR", "aioharmony"):
+        assert await client._connect_transport() is True  # noqa: SLF001
+    assert client.protocol == XMPP
+    assert any("WEBSOCKETS connect failed" in r.message for r in caplog.records)
+
+
+async def test_connect_transport_keeps_winner_when_loser_close_fails(
+    client: HarmonyClient,
+) -> None:
+    ws = _fake_connector(_hanging())
+    ws.close = AsyncMock(side_effect=RuntimeError("close failed"))
+    xmpp = _fake_connector(AsyncMock(return_value=True))
+    ws_cls, xmpp_cls, delay = _patch_connectors(ws, xmpp)
+    with ws_cls, xmpp_cls, delay:
+        assert await client._connect_transport() is True  # noqa: SLF001
+    assert client._hub_connection is xmpp  # noqa: SLF001
+    ws.close.assert_awaited_once()
+
+
+async def test_staggered_race_propagates_exception_and_cancels_the_rest() -> None:
+    from aioharmony.harmonyclient import _staggered_race  # noqa: PLC0415
+
+    cancelled = asyncio.Event()
+
+    async def hang() -> str | None:
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            cancelled.set()
+            raise
+        return "never"
+
+    async def explode() -> str | None:
+        raise RuntimeError("boom")
+
+    with pytest.raises(RuntimeError, match="boom"):
+        await _staggered_race([hang, explode], 0.01)
+    assert cancelled.is_set()
 
 
 async def test_connect_transport_treats_timeout_as_failure(

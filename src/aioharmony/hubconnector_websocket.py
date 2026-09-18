@@ -347,7 +347,7 @@ class HubConnector:
             ) as response:
                 json_response = await response.json(content_type=None, loads=json_loads)
                 _LOGGER.debug("%s: Post response: %s", self._ip_address, json_response)
-        except aiohttp.ClientConnectionError as exc:
+        except (aiohttp.ClientConnectorError, aiohttp.ServerTimeoutError) as exc:
             _LOGGER.debug("%s: Unable to connect for post: %s", self._ip_address, exc)
         except aiohttp.ClientError:
             _LOGGER.exception("%s: Exception on post", self._ip_address)

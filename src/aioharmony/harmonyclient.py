@@ -7,7 +7,6 @@ this class allows one to query or send commands to the Hub.
 """
 
 import asyncio
-import contextlib
 import copy
 import logging
 from collections.abc import Awaitable, Callable, Sequence
@@ -83,9 +82,7 @@ async def _staggered_race(
     finally:
         for task in tasks:
             task.cancel()
-        for task in tasks:
-            with contextlib.suppress(asyncio.CancelledError):
-                await task
+        await asyncio.gather(*tasks, return_exceptions=True)
     return None
 
 
@@ -201,8 +198,13 @@ class HarmonyClient:
         async def attempt(protocol: str) -> str | None:
             connector = connectors[protocol] = self._new_connector(protocol)
             try:
-                connected = await connector.hub_connect()
+                # is_reconnect only lowers the connector's failure logs to
+                # debug; a lost race is expected and reported once below.
+                connected = await connector.hub_connect(is_reconnect=True)
             except aioexc.TimeOut:
+                connected = False
+            except Exception:
+                _LOGGER.exception("%s: %s connect failed", self.name, protocol)
                 connected = False
             return protocol if connected else None
 
@@ -212,21 +214,31 @@ class HarmonyClient:
                 [partial(attempt, protocol) for protocol in protocols],
                 _TRANSPORT_FALLBACK_DELAY,
             )
+            if winner is not None:
+                self._protocol = winner
+                self._hub_connection = connectors[winner]
+                self._hub_connection.callbacks = ConnectorCallbackType(
+                    None, self._callbacks.disconnect
+                )
         finally:
-            await asyncio.gather(
-                *(c.close() for p, c in connectors.items() if p != winner)
-            )
+            losers = [c for p, c in connectors.items() if p != winner]
+            for exc in await asyncio.gather(
+                *(c.close() for c in losers), return_exceptions=True
+            ):
+                if isinstance(exc, Exception):
+                    _LOGGER.debug(
+                        "%s: Closing unused transport failed: %r", self.name, exc
+                    )
 
         if winner is None:
-            _LOGGER.debug("%s: Unable to connect using %s", self.name, protocols)
+            _LOGGER.error(
+                "%s: Unable to connect to hub over %s",
+                self.name,
+                " or ".join(protocols),
+            )
             return False
 
         _LOGGER.debug("%s: Using %s", self.name, winner)
-        self._protocol = winner
-        self._hub_connection = connectors[winner]
-        self._hub_connection.callbacks = ConnectorCallbackType(
-            None, self._callbacks.disconnect
-        )
         return True
 
     async def connect(self) -> bool:
