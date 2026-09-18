@@ -48,6 +48,7 @@ aioharmony = "aioharmony.__main__:main"
 
 [dependency-groups]
 dev = [
+  "blockbuster>=1.5.5,<1.6",
   "pytest>=8,<10",
   "pytest-asyncio>=0.25.2",
   "pytest-cov>=6,<8",

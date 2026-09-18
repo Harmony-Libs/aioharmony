@@ -21,6 +21,7 @@ from aioharmony.responsehandler import Handler
 hub_client = None
 
 _ROOTLOGGER = logging.getLogger()
+_LOGLEVELS = {logging.getLevelName(level): level for level in [10, 20, 30, 40, 50]}
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -361,10 +362,8 @@ async def execute_per_hub(hub, args):
     _LOGGER.debug("%s: All done with HUB.", hub)
 
 
-async def run():
-    """Main method for the script."""
-    global hub_client  # noqa: PLW0602
-
+def build_parser() -> argparse.ArgumentParser:
+    """Build the CLI argument parser."""
     parser = argparse.ArgumentParser(
         description="aioharmony - Harmony device control",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -383,7 +382,6 @@ async def run():
     )
 
     # Flags with default values go here.
-    loglevels = {logging.getLevelName(level): level for level in [10, 20, 30, 40, 50]}
     parser.add_argument(
         "--protocol",
         required=False,
@@ -395,7 +393,7 @@ async def run():
     parser.add_argument(
         "--loglevel",
         default="ERROR",
-        choices=list(loglevels.keys()),
+        choices=list(_LOGLEVELS),
         help="Logging level for all components to print to the console.",
     )
     parser.add_argument(
@@ -533,14 +531,34 @@ async def run():
     change_channel_parser.add_argument("--channel", help="Channel to switch to.")
     change_channel_parser.set_defaults(func=change_channel)
 
+    return parser
+
+
+def parse_args() -> argparse.Namespace | None:
+    """Parse ``sys.argv``; return ``None`` if the arguments are invalid or incomplete."""
+    parser = build_parser()
     args = parser.parse_args()
 
+    if args.wait < 0 and args.wait != -1:
+        print("Invalid value provided for --wait.")
+        parser.print_help()
+        return None
+
+    if not args.discover and not hasattr(args, "func") and not args.show_responses:
+        parser.print_help()
+        return None
+
+    return args
+
+
+def setup_logging(args: argparse.Namespace) -> None:
+    """Configure the root logger from the parsed CLI arguments."""
     log_formatter = logging.Formatter(
         "%(asctime)s:%(levelname)s:\t%(name)s\t%(message)s"
     )
     log_stream = logging.StreamHandler()
     log_stream.setFormatter(log_formatter)
-    _ROOTLOGGER.setLevel(loglevels[args.loglevel])
+    _ROOTLOGGER.setLevel(_LOGLEVELS[args.loglevel])
     _ROOTLOGGER.addHandler(log_stream)
 
     if args.logmodules is not None:
@@ -548,27 +566,21 @@ async def run():
         log_filter = LoggingFilter(log_modules)
         log_stream.addFilter(log_filter)
 
-    if args.wait < 0 and args.wait != -1:
-        print("Invalid value provided for --wait.")
-        parser.print_help()
-        return
 
+async def run(args: argparse.Namespace) -> None:
+    """Run the requested command against every hub."""
     if args.discover:
         # discover(args)
-        pass
-    else:
-        if not hasattr(args, "func") and not args.show_responses:
-            parser.print_help()
-            return
+        return
 
-        hub_ips = args.harmony_ip.split(",")
-        # Connect to the HUB
-        hub_tasks = [asyncio.create_task(execute_per_hub(hub, args)) for hub in hub_ips]
+    hub_ips = args.harmony_ip.split(",")
+    # Connect to the HUB
+    hub_tasks = [asyncio.create_task(execute_per_hub(hub, args)) for hub in hub_ips]
 
-        results = await asyncio.gather(*hub_tasks, return_exceptions=True)
-        for result in results:
-            if isinstance(result, Exception):
-                raise result
+    results = await asyncio.gather(*hub_tasks, return_exceptions=True)
+    for result in results:
+        if isinstance(result, Exception):
+            raise result
 
 
 def cancel_tasks(loop):
@@ -585,9 +597,14 @@ def cancel_tasks(loop):
 
 
 def main() -> None:
+    args = parse_args()
+    if args is None:
+        return
+
+    setup_logging(args)
     loop = asyncio.new_event_loop()
     try:
-        loop.run_until_complete(run())
+        loop.run_until_complete(run(args))
         cancel_tasks(loop)
         loop.close()
 
