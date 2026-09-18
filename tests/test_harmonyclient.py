@@ -311,6 +311,37 @@ async def test_connect_transport_uses_websockets_when_it_connects(
     xmpp_class.assert_not_called()
 
 
+async def test_connect_transport_tries_websockets_first(
+    client: HarmonyClient,
+) -> None:
+    loop = asyncio.get_running_loop()
+    started: dict[str, float] = {}
+    ws = _fake_connector(_hanging())
+    xmpp = _fake_connector(AsyncMock(return_value=True))
+
+    def _record(name: str, connector: MagicMock):
+        def _build(**_kwargs: Any) -> MagicMock:
+            started[name] = loop.time()
+            return connector
+
+        return _build
+
+    with (
+        patch(
+            "aioharmony.hubconnector_websocket.HubConnector",
+            side_effect=_record(WEBSOCKETS, ws),
+        ),
+        patch(
+            "aioharmony.hubconnector_xmpp.HubConnector",
+            side_effect=_record(XMPP, xmpp),
+        ),
+        patch("aioharmony.harmonyclient._TRANSPORT_FALLBACK_DELAY", 0.05),
+    ):
+        assert await client._connect_transport() is True  # noqa: SLF001
+    assert list(started) == [WEBSOCKETS, XMPP]
+    assert started[XMPP] - started[WEBSOCKETS] >= 0.05
+
+
 async def test_connect_transport_falls_back_to_xmpp_when_websockets_refused(
     client: HarmonyClient,
 ) -> None:
