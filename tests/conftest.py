@@ -26,6 +26,7 @@ def mock_client() -> MagicMock:
     client.start_activity = AsyncMock(return_value=(True, "ok"))
     client.send_commands = AsyncMock(return_value=[])
     client.change_channel = AsyncMock(return_value=True)
+    client.set_sleep_timer = AsyncMock(return_value=True)
     client.sync = AsyncMock(return_value=True)
     client.get_device_id = MagicMock(return_value="dev42")
     client.get_device_name = MagicMock(return_value="TV")
