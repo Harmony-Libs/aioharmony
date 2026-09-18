@@ -9,15 +9,21 @@ this class allows one to query or send commands to the Hub.
 import asyncio
 import copy
 import logging
+from collections.abc import Awaitable, Callable, Sequence
 from datetime import timedelta
+from functools import partial
+from typing import TypeVar
 from uuid import uuid4
 
 from async_timeout import timeout
 
 import aioharmony.exceptions as aioexc
 import aioharmony.handler as handlers
+
+# Imported eagerly on purpose: slixmpp reads its package metadata on import,
+# which would block the event loop if deferred to the first XMPP connect.
+from aioharmony import hubconnector_websocket, hubconnector_xmpp
 from aioharmony.const import (
-    DEFAULT_WS_HUB_PORT,
     HUB_COMMANDS,
     PROTOCOL,
     WEBSOCKETS,
@@ -35,6 +41,53 @@ from aioharmony.responsehandler import Handler, ResponseHandler
 _LOGGER = logging.getLogger(__name__)
 
 DEFAULT_TIMEOUT = 60
+DEFAULT_CONNECT_TIMEOUT = 25
+# Seconds the websocket connect runs alone before XMPP is also attempted.
+# Matches the websocket connect timeout so a hub on slow WiFi gets the full
+# window before XMPP is tried, while an unreachable one hands off no later.
+_TRANSPORT_FALLBACK_DELAY = 5
+
+_T = TypeVar("_T")
+_HubConnector = hubconnector_websocket.HubConnector | hubconnector_xmpp.HubConnector
+
+
+def _take_winner(tasks: list[asyncio.Task[_T | None]], done: set) -> _T | None:
+    # Walk in start order so the preferred transport wins a tie.
+    for task in list(tasks):
+        if task in done:
+            tasks.remove(task)
+            if (winner := task.result()) is not None:
+                return winner
+    return None
+
+
+async def _staggered_race(
+    coro_fns: Sequence[Callable[[], Awaitable[_T | None]]], delay: float
+) -> _T | None:
+    """Start coroutines staggered by delay and return the first non-None result.
+
+    A coroutine returning None counts as failed and starts the next one at once.
+    Remaining coroutines are cancelled once one succeeds.
+    """
+    pending = list(coro_fns)
+    tasks: list[asyncio.Task[_T | None]] = []
+    try:
+        while tasks or pending:
+            if pending:
+                tasks.append(asyncio.create_task(pending.pop(0)()))
+            done, _ = await asyncio.wait(
+                tasks,
+                timeout=delay if pending else None,
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            if (winner := _take_winner(tasks, done)) is not None:
+                return winner
+    finally:
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+    return None
+
 
 # TODO: Add docstyle comments
 # TODO: Clean up code styling
@@ -132,47 +185,82 @@ class HarmonyClient:
     def current_activity_id(self):
         return self._current_activity_id
 
-    async def _websocket_or_xmpp(self) -> bool:
-        """Determine if web sockets are enabled, if not fall-back to XMPP."""
-        if self._protocol != XMPP:
-            try:
-                _, _ = await asyncio.open_connection(
-                    host=self._ip_address, port=DEFAULT_WS_HUB_PORT
-                )
-            except ConnectionRefusedError:
-                if self._protocol == XMPP:
-                    _LOGGER.warning(
-                        "%s: WEBSOCKETS is not enabled on this HUB, will be defaulting back to XMPP.",
-                        self.name,
-                    )
-                else:
-                    _LOGGER.debug(
-                        "%s: WEBSOCKETS is not enabled, using XMPP.", self.name
-                    )
-                self._protocol = XMPP
-            except OSError:
-                _LOGGER.exception(
-                    "%s: Unable to determine if Websocket is available",
-                    self.name,
-                )
-                if self._protocol is None:
-                    return False
-            else:
-                _LOGGER.debug("%s: Websocket available", self.name)
-                self._protocol = WEBSOCKETS
-
-        if self._protocol == WEBSOCKETS:
-            _LOGGER.debug("%s: Using WEBSOCKETS", self.name)
-            from aioharmony.hubconnector_websocket import HubConnector  # noqa: PLC0415
-        else:
-            _LOGGER.debug("%s: Using XMPP", self.name)
-            from aioharmony.hubconnector_xmpp import HubConnector  # noqa: PLC0415
-
-        self._hub_connection = HubConnector(
+    def _new_connector(self, protocol: str) -> _HubConnector:
+        module = hubconnector_websocket if protocol == WEBSOCKETS else hubconnector_xmpp
+        return module.HubConnector(
             ip_address=self._ip_address,
-            callbacks=ConnectorCallbackType(None, self._callbacks.disconnect),
+            callbacks=ConnectorCallbackType(None, None),
             response_queue=self._response_queue,
         )
+
+    async def _connect_transport(self) -> bool:
+        """Connect over websockets, falling back to XMPP, and keep the winner."""
+        protocols = [self._protocol] if self._protocol else [WEBSOCKETS, XMPP]
+        connectors: dict[str, _HubConnector] = {}
+
+        # is_reconnect only lowers the connector's failure logs to debug; a
+        # lost race is expected and reported once below, but an explicitly
+        # chosen transport keeps its detailed failure logs.
+        quiet = len(protocols) > 1
+
+        async def attempt(protocol: str) -> str | None:
+            connector = connectors[protocol] = self._new_connector(protocol)
+            try:
+                connected = await connector.hub_connect(is_reconnect=quiet)
+            except aioexc.TimeOut:
+                _LOGGER.log(
+                    logging.DEBUG if quiet else logging.ERROR,
+                    "%s: %s connect timed out",
+                    self.name,
+                    protocol,
+                )
+                connected = False
+            except Exception:
+                _LOGGER.exception("%s: %s connect failed", self.name, protocol)
+                connected = False
+            return protocol if connected else None
+
+        winner = None
+        try:
+            async with timeout(DEFAULT_CONNECT_TIMEOUT):
+                winner = await _staggered_race(
+                    [partial(attempt, protocol) for protocol in protocols],
+                    _TRANSPORT_FALLBACK_DELAY,
+                )
+            if winner is not None:
+                self._protocol = winner
+                self._hub_connection = connectors[winner]
+                self._hub_connection.callbacks = ConnectorCallbackType(
+                    None, self._callbacks.disconnect
+                )
+        finally:
+            # Outside the connect timeout so a slow loser teardown cannot
+            # fail a connect that already succeeded.
+            losers = [c for p, c in connectors.items() if p != winner]
+            for exc in await asyncio.gather(
+                *(c.close() for c in losers), return_exceptions=True
+            ):
+                if isinstance(exc, Exception):
+                    _LOGGER.debug(
+                        "%s: Closing unused transport failed: %r", self.name, exc
+                    )
+
+        if winner is None:
+            _LOGGER.error(
+                "%s: Unable to connect to hub over %s",
+                self.name,
+                " or ".join(protocols),
+            )
+            return False
+
+        if winner != protocols[0]:
+            _LOGGER.warning(
+                "%s: Using %s because %s did not connect",
+                self.name,
+                winner,
+                protocols[0],
+            )
+        _LOGGER.debug("%s: Using %s", self.name, winner)
         return True
 
     async def connect(self) -> bool:
@@ -180,15 +268,16 @@ class HarmonyClient:
         :rtype: bool
         :raises: :class:`~aioharmony.exceptions.TimeOut`
         """
-        if self._hub_connection is None and not await self._websocket_or_xmpp():
-            return False
-
         try:
-            async with timeout(DEFAULT_TIMEOUT):
-                if not await self._hub_connection.hub_connect():
-                    return False
+            if self._hub_connection is None:
+                connected = await self._connect_transport()
+            else:
+                async with timeout(DEFAULT_CONNECT_TIMEOUT):
+                    connected = await self._hub_connection.hub_connect()
         except asyncio.TimeoutError:
             raise aioexc.TimeOut
+        if not connected:
+            return False
 
         # Initiate a sync. That will then result in our notification handler
         # to receive the response and set our current config version
