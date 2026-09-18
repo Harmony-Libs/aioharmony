@@ -9,7 +9,7 @@ import logging
 import sys
 from datetime import datetime, timedelta, timezone
 from re import Pattern
-from typing import NamedTuple
+from typing import Any, NamedTuple
 from uuid import uuid4
 
 from aioharmony.handler import Handler
@@ -19,7 +19,7 @@ DEFAULT_TIMEOUT = 60
 
 _LOGGER = logging.getLogger(__name__)
 
-DataPatternType = tuple[str, Pattern]
+DataPatternType = tuple[str, Pattern[str]]
 
 RespDataPatternType = list[DataPatternType] | DataPatternType
 
@@ -47,14 +47,16 @@ class ResponseHandler:
     :type message_queue: asyncio.Queue
     """
 
-    def __init__(self, message_queue: asyncio.Queue, name: str = None) -> None:
+    def __init__(
+        self, message_queue: asyncio.Queue[dict[str, Any]], name: str | None = None
+    ) -> None:
         self._message_queue = message_queue
         self._name = name
-        self._handler_list = []
+        self._handler_list: list[CallbackEntryType] = []
 
         self._callback_task = asyncio.create_task(self._callback_handler())
 
-    async def close(self):
+    async def close(self) -> None:
         """Close all connections and tasks
 
         This should be called to ensure everything is stopped and
@@ -67,8 +69,8 @@ class ResponseHandler:
     def register_handler(
         self,
         handler: Handler,
-        msgid: str = None,
-        expiration: datetime | timedelta = None,
+        msgid: str | None = None,
+        expiration: datetime | timedelta | None = None,
     ) -> str:
         """Register a handler.
 
@@ -151,7 +153,9 @@ class ResponseHandler:
         return found_uuid
 
     # pylint: disable=too-many-return-statements
-    def _handler_match(self, dict_list, message, key=None):
+    def _handler_match(
+        self, dict_list: Any, message: Any, key: str | None = None
+    ) -> bool:
         if key is not None:
             message = message.get(key)
             value = dict_list.get(key)
@@ -187,7 +191,7 @@ class ResponseHandler:
 
         return value == message
 
-    def _get_handlers(self, message: dict) -> list[CallbackEntryType]:
+    def _get_handlers(self, message: dict[str, Any]) -> list[CallbackEntryType]:
         """Find the handlers to be called for the JSON message received
 
         :param message: JSON message to use
@@ -223,7 +227,7 @@ class ResponseHandler:
         return callback_list
 
     def _unregister_expired_handlers(
-        self, single_handler: CallbackEntryType = None
+        self, single_handler: CallbackEntryType | None = None
     ) -> bool:
         """Unregisters any expired handlers based on their expiration
         datetime. Will check the handler dict instead of the list if provided
