@@ -20,6 +20,9 @@ from async_timeout import timeout
 
 import aioharmony.exceptions as aioexc
 import aioharmony.handler as handlers
+
+# Imported eagerly on purpose: slixmpp reads its package metadata on import,
+# which would block the event loop if deferred to the first XMPP connect.
 from aioharmony import hubconnector_websocket, hubconnector_xmpp
 from aioharmony.const import (
     HUB_COMMANDS,

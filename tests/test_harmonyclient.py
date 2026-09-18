@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import subprocess
 import sys
 from collections.abc import AsyncGenerator
 from typing import Any
@@ -437,11 +438,19 @@ async def test_connect_transport_only_tries_explicit_protocol(protocol: str) -> 
     assert xmpp_class.call_count == (protocol == XMPP)
 
 
-def test_xmpp_connector_is_imported_eagerly() -> None:
-    import aioharmony.harmonyclient as module  # noqa: PLC0415
-
-    assert module.hubconnector_xmpp.HubConnector is not None
-    assert "slixmpp" in sys.modules
+def test_slixmpp_is_imported_with_the_client() -> None:
+    """Importing the public API in a fresh interpreter must already load slixmpp."""
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import sys, aioharmony.harmonyapi; print('slixmpp' in sys.modules)",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert result.stdout.strip() == "True"
 
 
 # ---------------------------------------------------------------------------
