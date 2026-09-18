@@ -43,8 +43,9 @@ HUB_COMMANDS = {
 # Different types used within aioharmony
 #
 
-# Type for callback parameters
-CallbackType = asyncio.Future | asyncio.Event | Callable[[object, Any | None], Any]
+# Type for callback parameters. A plain callable callback receives a single
+# positional argument: the result/message. See helpers.call_raw_callback.
+CallbackType = asyncio.Future[Any] | asyncio.Event | Callable[[object], Any]
 
 
 class ClientCallbackType(NamedTuple):
@@ -61,13 +62,13 @@ class ConnectorCallbackType(NamedTuple):
 
 
 class ClientConfigType(NamedTuple):
-    config: dict
-    info: dict
-    discover_info: dict
-    hub_state: dict
+    config: dict[str, Any]
+    info: dict[str, Any]
+    discover_info: dict[str, Any]
+    hub_state: dict[str, Any]
     config_version: int | None
-    activities: list[dict]
-    devices: list[dict]
+    activities: list[dict[str, Any]]
+    devices: list[dict[str, Any]]
 
 
 # Type for a command to send to the HUB
