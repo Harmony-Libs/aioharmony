@@ -10,6 +10,7 @@ from uuid import uuid4
 
 import aiohttp
 from aiohttp.client_ws import ClientWSTimeout
+from aiohttp.connector import NEEDS_CLEANUP_CLOSED
 from async_timeout import timeout
 
 from aioharmony.const import DEFAULT_WS_HUB_PORT as DEFAULT_HUB_PORT
@@ -100,9 +101,9 @@ class HubConnector:
         # Specify socket
         conn = aiohttp.TCPConnector(
             family=socket.AF_INET,
-            verify_ssl=False,
+            ssl=False,
             force_close=True,
-            enable_cleanup_closed=True,
+            enable_cleanup_closed=NEEDS_CLEANUP_CLOSED,
         )
 
         session_timeout = aiohttp.ClientTimeout(connect=DEFAULT_TIMEOUT)
