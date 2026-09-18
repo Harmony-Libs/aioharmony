@@ -390,6 +390,22 @@ async def test_connect_transport_keeps_websockets_when_xmpp_fails(
     ws.close.assert_not_awaited()
 
 
+async def test_connect_transport_outlasts_a_late_xmpp_failure(
+    client: HarmonyClient,
+) -> None:
+    loop = asyncio.get_running_loop()
+    ws_release, xmpp_release = asyncio.Event(), asyncio.Event()
+    ws = _fake_connector(_hanging(ws_release))
+    xmpp = _fake_connector(_hanging(xmpp_release, result=False))
+    ws_cls, xmpp_cls, delay = _patch_connectors(ws, xmpp)
+    with ws_cls, xmpp_cls, delay:
+        loop.call_later(0.05, xmpp_release.set)
+        loop.call_later(0.1, ws_release.set)
+        assert await client._connect_transport() is True  # noqa: SLF001
+    assert client.protocol == WEBSOCKETS
+    xmpp.close.assert_awaited_once()
+
+
 async def test_connect_transport_prefers_websockets_when_both_succeed(
     client: HarmonyClient,
 ) -> None:
