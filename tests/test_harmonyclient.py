@@ -568,6 +568,30 @@ async def test_get_config_returns_none_when_code_not_200(
     assert result is None
 
 
+async def test_get_config_returns_none_when_data_missing(
+    client: HarmonyClient,
+) -> None:
+    """Code 200 but no 'data' payload must return None, not raise."""
+    with patch.object(client, "send_to_hub", AsyncMock(return_value={"code": 200})):
+        result = await client._get_config()  # noqa: SLF001
+
+    assert result is None
+
+
+async def test_get_config_tolerates_missing_activity_and_device_keys(
+    client: HarmonyClient,
+) -> None:
+    """Code 200 with a data dict lacking activity/device keys yields empty lists."""
+    with patch.object(
+        client, "send_to_hub", AsyncMock(return_value={"code": 200, "data": {}})
+    ):
+        result = await client._get_config()  # noqa: SLF001
+
+    assert result == {}
+    assert client.hub_config.activities == []
+    assert client.hub_config.devices == []
+
+
 async def test_get_config_retries_once_on_timeout(client: HarmonyClient) -> None:
     send = AsyncMock(side_effect=[aioexc.TimeOut, _config_response_ok()])
     with patch.object(client, "send_to_hub", send):
