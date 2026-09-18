@@ -3,7 +3,8 @@
 from __future__ import annotations
 
 import asyncio
-from unittest.mock import MagicMock, patch
+import ssl
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 import slixmpp
@@ -159,6 +160,28 @@ async def test_close_calls_hub_disconnect() -> None:
     hub.hub_disconnect = fake_hub_disconnect  # type: ignore[method-assign]
     await hub.close()
     assert fake_hub_disconnect.called is True  # type: ignore[attr-defined]
+
+
+async def test_close_cancels_pending_connection_attempt() -> None:
+    """close() aborts an in-flight slixmpp connect before disconnecting."""
+    hub = _make_hub()
+    hub.cancel_connection_attempt = MagicMock()  # type: ignore[method-assign]
+    hub.hub_disconnect = AsyncMock()  # type: ignore[method-assign]
+    await hub.close()
+    hub.cancel_connection_attempt.assert_called_once()
+    hub.hub_disconnect.assert_awaited_once()
+
+
+async def test_init_does_not_load_system_certificates() -> None:
+    """Constructing the connector must not touch the CA store on the loop."""
+    with (
+        patch.object(
+            ssl.SSLContext, "set_default_verify_paths", side_effect=AssertionError
+        ),
+        patch.object(ssl.SSLContext, "load_default_certs", side_effect=AssertionError),
+    ):
+        hub = _make_hub()
+    assert isinstance(hub.ssl_context, ssl.SSLContext)
 
 
 async def test_connected_handler_sets_flag_and_fires_callback() -> None:

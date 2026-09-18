@@ -7,17 +7,21 @@ this class allows one to query or send commands to the Hub.
 """
 
 import asyncio
+import contextlib
 import copy
 import logging
+from collections.abc import Awaitable, Callable, Sequence
 from datetime import timedelta
+from functools import partial
+from typing import TypeVar
 from uuid import uuid4
 
 from async_timeout import timeout
 
 import aioharmony.exceptions as aioexc
 import aioharmony.handler as handlers
+from aioharmony import hubconnector_websocket, hubconnector_xmpp
 from aioharmony.const import (
-    DEFAULT_WS_HUB_PORT,
     HUB_COMMANDS,
     PROTOCOL,
     WEBSOCKETS,
@@ -35,6 +39,78 @@ from aioharmony.responsehandler import Handler, ResponseHandler
 _LOGGER = logging.getLogger(__name__)
 
 DEFAULT_TIMEOUT = 60
+# Seconds the websocket connect runs alone before XMPP is also attempted.
+_TRANSPORT_FALLBACK_DELAY = 2
+
+_T = TypeVar("_T")
+
+
+class _TransportUnavailable(Exception):
+    """Raised when a transport could not connect to the hub."""
+
+
+def _set_result(future: asyncio.Future[None]) -> None:
+    if not future.done():
+        future.set_result(None)
+
+
+async def _staggered_race(
+    coro_fns: Sequence[Callable[[], Awaitable[_T]]], delay: float
+) -> _T | None:
+    """Start coroutines staggered by delay and return the first success.
+
+    A coroutine that raises counts as failed and starts the next one at once.
+    Remaining coroutines are cancelled once one succeeds.
+    """
+    loop = asyncio.get_running_loop()
+    tasks: list[asyncio.Task[tuple[_T] | None]] = []
+    timer: asyncio.TimerHandle | None = None
+
+    async def run_one(
+        coro_fn: Callable[[], Awaitable[_T]], start_next: asyncio.Future[None]
+    ) -> tuple[_T] | None:
+        try:
+            result = await coro_fn()
+        except Exception:
+            _set_result(start_next)
+            return None
+        return (result,)
+
+    def take_winner(done: set[asyncio.Future]) -> tuple[_T] | None:
+        # Walk in start order so the preferred transport wins a tie.
+        for task in list(tasks):
+            if task in done:
+                tasks.remove(task)
+                if (winner := task.result()) is not None:
+                    return winner
+        return None
+
+    try:
+        for coro_fn in coro_fns:
+            start_next: asyncio.Future[None] = loop.create_future()
+            tasks.append(loop.create_task(run_one(coro_fn, start_next)))
+            timer = loop.call_later(delay, _set_result, start_next)
+            while not start_next.done():
+                done, _ = await asyncio.wait(
+                    {*tasks, start_next}, return_when=asyncio.FIRST_COMPLETED
+                )
+                if winner := take_winner(done):
+                    return winner[0]
+            timer.cancel()
+        while tasks:
+            done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+            if winner := take_winner(done):
+                return winner[0]
+    finally:
+        if timer is not None:
+            timer.cancel()
+        for task in tasks:
+            task.cancel()
+        for task in tasks:
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
+    return None
+
 
 # TODO: Add docstyle comments
 # TODO: Clean up code styling
@@ -132,46 +208,51 @@ class HarmonyClient:
     def current_activity_id(self):
         return self._current_activity_id
 
-    async def _websocket_or_xmpp(self) -> bool:
-        """Determine if web sockets are enabled, if not fall-back to XMPP."""
-        if self._protocol != XMPP:
-            try:
-                _, _ = await asyncio.open_connection(
-                    host=self._ip_address, port=DEFAULT_WS_HUB_PORT
-                )
-            except ConnectionRefusedError:
-                if self._protocol == XMPP:
-                    _LOGGER.warning(
-                        "%s: WEBSOCKETS is not enabled on this HUB, will be defaulting back to XMPP.",
-                        self.name,
-                    )
-                else:
-                    _LOGGER.debug(
-                        "%s: WEBSOCKETS is not enabled, using XMPP.", self.name
-                    )
-                self._protocol = XMPP
-            except OSError:
-                _LOGGER.exception(
-                    "%s: Unable to determine if Websocket is available",
-                    self.name,
-                )
-                if self._protocol is None:
-                    return False
-            else:
-                _LOGGER.debug("%s: Websocket available", self.name)
-                self._protocol = WEBSOCKETS
-
-        if self._protocol == WEBSOCKETS:
-            _LOGGER.debug("%s: Using WEBSOCKETS", self.name)
-            from aioharmony.hubconnector_websocket import HubConnector  # noqa: PLC0415
-        else:
-            _LOGGER.debug("%s: Using XMPP", self.name)
-            from aioharmony.hubconnector_xmpp import HubConnector  # noqa: PLC0415
-
-        self._hub_connection = HubConnector(
+    def _new_connector(
+        self, protocol: str
+    ) -> hubconnector_websocket.HubConnector | hubconnector_xmpp.HubConnector:
+        module = hubconnector_websocket if protocol == WEBSOCKETS else hubconnector_xmpp
+        return module.HubConnector(
             ip_address=self._ip_address,
-            callbacks=ConnectorCallbackType(None, self._callbacks.disconnect),
+            callbacks=ConnectorCallbackType(None, None),
             response_queue=self._response_queue,
+        )
+
+    async def _connect_transport(self) -> bool:
+        """Connect over websockets, falling back to XMPP, and keep the winner."""
+        protocols = [self._protocol] if self._protocol else [WEBSOCKETS, XMPP]
+        connectors: dict[str, object] = {}
+
+        async def attempt(protocol: str) -> str:
+            connector = connectors[protocol] = self._new_connector(protocol)
+            try:
+                connected = await connector.hub_connect()
+            except aioexc.TimeOut:
+                connected = False
+            if not connected:
+                raise _TransportUnavailable(protocol)
+            return protocol
+
+        winner = None
+        try:
+            winner = await _staggered_race(
+                [partial(attempt, protocol) for protocol in protocols],
+                _TRANSPORT_FALLBACK_DELAY,
+            )
+        finally:
+            for protocol, connector in connectors.items():
+                if protocol != winner:
+                    await connector.close()
+
+        if winner is None:
+            _LOGGER.debug("%s: Unable to connect using %s", self.name, protocols)
+            return False
+
+        _LOGGER.debug("%s: Using %s", self.name, winner)
+        self._protocol = winner
+        self._hub_connection = connectors[winner]
+        self._hub_connection.callbacks = ConnectorCallbackType(
+            None, self._callbacks.disconnect
         )
         return True
 
@@ -180,15 +261,16 @@ class HarmonyClient:
         :rtype: bool
         :raises: :class:`~aioharmony.exceptions.TimeOut`
         """
-        if self._hub_connection is None and not await self._websocket_or_xmpp():
-            return False
-
         try:
             async with timeout(DEFAULT_TIMEOUT):
-                if not await self._hub_connection.hub_connect():
-                    return False
+                if self._hub_connection is None:
+                    connected = await self._connect_transport()
+                else:
+                    connected = await self._hub_connection.hub_connect()
         except asyncio.TimeoutError:
             raise aioexc.TimeOut
+        if not connected:
+            return False
 
         # Initiate a sync. That will then result in our notification handler
         # to receive the response and set our current config version

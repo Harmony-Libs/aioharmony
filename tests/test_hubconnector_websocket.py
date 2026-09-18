@@ -315,14 +315,32 @@ async def test_callbacks_property_roundtrip() -> None:
     assert connector.callbacks is new_cb
 
 
-async def test_close_delegates_to_hub_disconnect() -> None:
-    """close() is a thin wrapper that just disconnects."""
+async def test_close_disconnects_and_closes_session() -> None:
+    """close() disconnects and releases the aiohttp session."""
     connector = _make_connector()
     connector.hub_disconnect = AsyncMock()  # type: ignore[method-assign]
+    connector.async_close_session = AsyncMock()  # type: ignore[method-assign]
 
     await connector.close()
 
     connector.hub_disconnect.assert_awaited_once()
+    connector.async_close_session.assert_awaited_once()
+
+
+async def test_hub_post_logs_connection_errors_at_debug(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """A refused or unreachable hub is a debug message, not a traceback."""
+    connector = _make_connector()
+    session = MagicMock()
+    session.post = MagicMock(side_effect=aiohttp.ClientConnectionError("refused"))
+    connector._aiohttp_session = session  # noqa: SLF001
+
+    with caplog.at_level("DEBUG", logger="aioharmony.hubconnector_websocket"):
+        assert await connector.hub_post("http://10.0.0.1:8088/", {}) is None
+
+    assert not [r for r in caplog.records if r.levelname == "ERROR"]
+    assert any("Unable to connect for post" in r.message for r in caplog.records)
 
 
 async def test_get_remote_id_returns_cached_value() -> None:

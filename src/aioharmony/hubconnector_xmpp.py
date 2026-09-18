@@ -3,6 +3,7 @@
 import asyncio
 import contextlib
 import logging
+import ssl
 import sys
 from uuid import uuid4
 
@@ -69,8 +70,13 @@ class HubConnector(slixmpp.ClientXMPP):
         self._init_super()
 
     def _init_super(self):
+        # Harmony speaks plain XMPP; a bare context keeps slixmpp from loading
+        # the system CA store on the event loop for TLS that is never used.
         super().__init__(
-            DEFAULT_USER, DEFAULT_PASSWORD, plugin_config=self._plugin_config
+            DEFAULT_USER,
+            DEFAULT_PASSWORD,
+            plugin_config=self._plugin_config,
+            ssl_context=ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT),
         )
 
         # Set keep-alive to 30 seconds.
@@ -123,6 +129,7 @@ class HubConnector(slixmpp.ClientXMPP):
         cancelled out.
         """
         # Close connections.
+        self.cancel_connection_attempt()
         await self.hub_disconnect()
 
     async def hub_connect(self, is_reconnect: bool = False) -> bool:

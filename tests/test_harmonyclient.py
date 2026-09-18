@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import sys
 from collections.abc import AsyncGenerator
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -265,69 +267,184 @@ async def test_unregister_handler_delegates(client: HarmonyClient) -> None:
 
 
 # ---------------------------------------------------------------------------
-# _websocket_or_xmpp transport selection
+# _connect_transport transport selection
 # ---------------------------------------------------------------------------
 
 
-async def test_websocket_or_xmpp_selects_websockets_when_probe_succeeds(
+def _fake_connector(hub_connect: AsyncMock) -> MagicMock:
+    connector = MagicMock()
+    connector.hub_connect = hub_connect
+    connector.close = AsyncMock()
+    return connector
+
+
+def _hanging(release: asyncio.Event | None = None, result: bool = True) -> AsyncMock:
+    async def _wait() -> bool:
+        await (release or asyncio.Event()).wait()
+        return result
+
+    return AsyncMock(side_effect=_wait)
+
+
+def _patch_connectors(ws: MagicMock, xmpp: MagicMock):
+    return (
+        patch("aioharmony.hubconnector_websocket.HubConnector", return_value=ws),
+        patch("aioharmony.hubconnector_xmpp.HubConnector", return_value=xmpp),
+        patch("aioharmony.harmonyclient._TRANSPORT_FALLBACK_DELAY", 0.01),
+    )
+
+
+async def test_connect_transport_uses_websockets_when_it_connects(
     client: HarmonyClient,
 ) -> None:
-    with (
-        patch(
-            "aioharmony.harmonyclient.asyncio.open_connection",
-            new=AsyncMock(return_value=(MagicMock(), MagicMock())),
-        ),
-        patch("aioharmony.hubconnector_websocket.HubConnector") as ws_connector,
-    ):
-        ok = await client._websocket_or_xmpp()  # noqa: SLF001
-    assert ok is True
+    disconnect_cb = MagicMock()
+    client._callbacks = _make_callbacks(disconnect=disconnect_cb)  # noqa: SLF001
+    ws = _fake_connector(AsyncMock(return_value=True))
+    xmpp = _fake_connector(AsyncMock(return_value=True))
+    ws_cls, xmpp_cls, delay = _patch_connectors(ws, xmpp)
+    with ws_cls, xmpp_cls as xmpp_class, delay:
+        assert await client._connect_transport() is True  # noqa: SLF001
     assert client.protocol == WEBSOCKETS
-    ws_connector.assert_called_once()
+    assert client._hub_connection is ws  # noqa: SLF001
+    assert ws.callbacks == ConnectorCallbackType(None, disconnect_cb)
+    ws.close.assert_not_awaited()
+    xmpp_class.assert_not_called()
 
 
-async def test_websocket_or_xmpp_falls_back_to_xmpp_on_connection_refused(
+async def test_connect_transport_falls_back_to_xmpp_when_websockets_refused(
     client: HarmonyClient,
 ) -> None:
+    ws = _fake_connector(AsyncMock(return_value=False))
+    xmpp = _fake_connector(AsyncMock(return_value=True))
+    ws_cls, xmpp_cls, _ = _patch_connectors(ws, xmpp)
     with (
-        patch(
-            "aioharmony.harmonyclient.asyncio.open_connection",
-            new=AsyncMock(side_effect=ConnectionRefusedError),
-        ),
-        patch("aioharmony.hubconnector_xmpp.HubConnector") as xmpp_connector,
+        ws_cls,
+        xmpp_cls,
+        patch("aioharmony.harmonyclient._TRANSPORT_FALLBACK_DELAY", 60),
     ):
-        ok = await client._websocket_or_xmpp()  # noqa: SLF001
-    assert ok is True
+        async with real_timeout(1):
+            assert await client._connect_transport() is True  # noqa: SLF001
     assert client.protocol == XMPP
-    xmpp_connector.assert_called_once()
+    assert client._hub_connection is xmpp  # noqa: SLF001
+    ws.close.assert_awaited_once()
+    xmpp.close.assert_not_awaited()
 
 
-async def test_websocket_or_xmpp_returns_false_on_oserror_with_unknown_protocol(
+async def test_connect_transport_starts_xmpp_after_fallback_delay(
     client: HarmonyClient,
 ) -> None:
-    with patch(
-        "aioharmony.harmonyclient.asyncio.open_connection",
-        new=AsyncMock(side_effect=OSError),
-    ):
-        ok = await client._websocket_or_xmpp()  # noqa: SLF001
-    assert ok is False
+    ws = _fake_connector(_hanging())
+    xmpp = _fake_connector(AsyncMock(return_value=True))
+    with contextlib.ExitStack() as stack:
+        for ctx in _patch_connectors(ws, xmpp):
+            stack.enter_context(ctx)
+        assert await client._connect_transport() is True  # noqa: SLF001
+    assert client.protocol == XMPP
+    ws.close.assert_awaited_once()
+    xmpp.close.assert_not_awaited()
+
+
+async def test_connect_transport_keeps_websockets_when_xmpp_fails(
+    client: HarmonyClient,
+) -> None:
+    release = asyncio.Event()
+    ws = _fake_connector(_hanging(release))
+    xmpp = _fake_connector(AsyncMock(return_value=False))
+    with contextlib.ExitStack() as stack:
+        for ctx in _patch_connectors(ws, xmpp):
+            stack.enter_context(ctx)
+        asyncio.get_running_loop().call_later(0.05, release.set)
+        assert await client._connect_transport() is True  # noqa: SLF001
+    assert client.protocol == WEBSOCKETS
+    xmpp.close.assert_awaited_once()
+    ws.close.assert_not_awaited()
+
+
+async def test_connect_transport_prefers_websockets_when_both_succeed(
+    client: HarmonyClient,
+) -> None:
+    release = asyncio.Event()
+    ws = _fake_connector(_hanging(release))
+
+    async def _xmpp_connects() -> bool:
+        release.set()
+        return True
+
+    xmpp = _fake_connector(AsyncMock(side_effect=_xmpp_connects))
+    with contextlib.ExitStack() as stack:
+        for ctx in _patch_connectors(ws, xmpp):
+            stack.enter_context(ctx)
+        assert await client._connect_transport() is True  # noqa: SLF001
+    assert client.protocol == WEBSOCKETS
+    xmpp.close.assert_awaited_once()
+    assert not isinstance(xmpp.callbacks, ConnectorCallbackType)
+
+
+async def test_connect_transport_treats_timeout_as_failure(
+    client: HarmonyClient,
+) -> None:
+    ws = _fake_connector(AsyncMock(side_effect=aioexc.TimeOut))
+    xmpp = _fake_connector(AsyncMock(return_value=True))
+    with contextlib.ExitStack() as stack:
+        for ctx in _patch_connectors(ws, xmpp):
+            stack.enter_context(ctx)
+        assert await client._connect_transport() is True  # noqa: SLF001
+    assert client.protocol == XMPP
+    ws.close.assert_awaited_once()
+
+
+async def test_connect_transport_returns_false_when_all_fail(
+    client: HarmonyClient,
+) -> None:
+    ws = _fake_connector(AsyncMock(return_value=False))
+    xmpp = _fake_connector(AsyncMock(return_value=False))
+    with contextlib.ExitStack() as stack:
+        for ctx in _patch_connectors(ws, xmpp):
+            stack.enter_context(ctx)
+        assert await client._connect_transport() is False  # noqa: SLF001
     assert client.protocol is None
+    assert client._hub_connection is None  # noqa: SLF001
+    ws.close.assert_awaited_once()
+    xmpp.close.assert_awaited_once()
 
 
-async def test_websocket_or_xmpp_skips_probe_when_protocol_is_explicit_xmpp(
+async def test_connect_times_out_and_closes_both_attempts(
     client: HarmonyClient,
 ) -> None:
-    client._protocol = XMPP  # noqa: SLF001
-    with (
-        patch(
-            "aioharmony.harmonyclient.asyncio.open_connection", new=AsyncMock()
-        ) as probe,
-        patch("aioharmony.hubconnector_xmpp.HubConnector") as xmpp_connector,
-    ):
-        ok = await client._websocket_or_xmpp()  # noqa: SLF001
-    assert ok is True
-    assert client.protocol == XMPP
-    probe.assert_not_called()
-    xmpp_connector.assert_called_once()
+    ws = _fake_connector(_hanging())
+    xmpp = _fake_connector(_hanging())
+    with contextlib.ExitStack() as stack:
+        for ctx in _patch_connectors(ws, xmpp):
+            stack.enter_context(ctx)
+        stack.enter_context(patch("aioharmony.harmonyclient.DEFAULT_TIMEOUT", 0.05))
+        with pytest.raises(aioexc.TimeOut):
+            await client.connect()
+    assert client._hub_connection is None  # noqa: SLF001
+    ws.close.assert_awaited_once()
+    xmpp.close.assert_awaited_once()
+
+
+@pytest.mark.parametrize("protocol", [WEBSOCKETS, XMPP])
+async def test_connect_transport_only_tries_explicit_protocol(protocol: str) -> None:
+    client = _make_client(protocol=protocol)
+    ws = _fake_connector(AsyncMock(return_value=True))
+    xmpp = _fake_connector(AsyncMock(return_value=True))
+    ws_cls, xmpp_cls, delay = _patch_connectors(ws, xmpp)
+    try:
+        with ws_cls as ws_class, xmpp_cls as xmpp_class, delay:
+            assert await client._connect_transport() is True  # noqa: SLF001
+    finally:
+        await client._callback_handler.close()  # noqa: SLF001
+    assert client.protocol == protocol
+    assert ws_class.call_count == (protocol == WEBSOCKETS)
+    assert xmpp_class.call_count == (protocol == XMPP)
+
+
+def test_xmpp_connector_is_imported_eagerly() -> None:
+    import aioharmony.harmonyclient as module  # noqa: PLC0415
+
+    assert module.hubconnector_xmpp.HubConnector is not None
+    assert "slixmpp" in sys.modules
 
 
 # ---------------------------------------------------------------------------
@@ -988,10 +1105,10 @@ async def test_refresh_info_from_hub_other_exception_raises(
 # ---------------------------------------------------------------------------
 
 
-async def test_connect_returns_false_when_transport_probe_fails(
+async def test_connect_returns_false_when_no_transport_connects(
     client: HarmonyClient,
 ) -> None:
-    with patch.object(client, "_websocket_or_xmpp", AsyncMock(return_value=False)):
+    with patch.object(client, "_connect_transport", AsyncMock(return_value=False)):
         result = await client.connect()
     assert result is False
 
