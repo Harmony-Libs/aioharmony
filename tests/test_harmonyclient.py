@@ -287,11 +287,11 @@ def _hanging(release: asyncio.Event | None = None, result: bool = True) -> Async
     return AsyncMock(side_effect=_wait)
 
 
-def _patch_connectors(ws: MagicMock, xmpp: MagicMock):
+def _patch_connectors(ws: MagicMock, xmpp: MagicMock, delay: float = 0.01):
     return (
         patch("aioharmony.hubconnector_websocket.HubConnector", return_value=ws),
         patch("aioharmony.hubconnector_xmpp.HubConnector", return_value=xmpp),
-        patch("aioharmony.harmonyclient._TRANSPORT_FALLBACK_DELAY", 0.01),
+        patch("aioharmony.harmonyclient._TRANSPORT_FALLBACK_DELAY", delay),
     )
 
 
@@ -348,12 +348,8 @@ async def test_connect_transport_falls_back_to_xmpp_when_websockets_refused(
 ) -> None:
     ws = _fake_connector(AsyncMock(return_value=False))
     xmpp = _fake_connector(AsyncMock(return_value=True))
-    ws_cls, xmpp_cls, _ = _patch_connectors(ws, xmpp)
-    with (
-        ws_cls,
-        xmpp_cls,
-        patch("aioharmony.harmonyclient._TRANSPORT_FALLBACK_DELAY", 60),
-    ):
+    ws_cls, xmpp_cls, delay = _patch_connectors(ws, xmpp, delay=60)
+    with ws_cls, xmpp_cls, delay:
         async with real_timeout(1):
             assert await client._connect_transport() is True  # noqa: SLF001
     assert client.protocol == XMPP

@@ -69,17 +69,17 @@ async def _staggered_race(
     A coroutine returning None counts as failed and starts the next one at once.
     Remaining coroutines are cancelled once one succeeds.
     """
+    pending = list(coro_fns)
     tasks: list[asyncio.Task[_T | None]] = []
     try:
-        for coro_fn in coro_fns:
-            tasks.append(asyncio.create_task(coro_fn()))
+        while tasks or pending:
+            if pending:
+                tasks.append(asyncio.create_task(pending.pop(0)()))
             done, _ = await asyncio.wait(
-                tasks, timeout=delay, return_when=asyncio.FIRST_COMPLETED
+                tasks,
+                timeout=delay if pending else None,
+                return_when=asyncio.FIRST_COMPLETED,
             )
-            if (winner := _take_winner(tasks, done)) is not None:
-                return winner
-        while tasks:
-            done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
             if (winner := _take_winner(tasks, done)) is not None:
                 return winner
     finally:
