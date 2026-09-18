@@ -43,7 +43,9 @@ _LOGGER = logging.getLogger(__name__)
 DEFAULT_TIMEOUT = 60
 DEFAULT_CONNECT_TIMEOUT = 25
 # Seconds the websocket connect runs alone before XMPP is also attempted.
-_TRANSPORT_FALLBACK_DELAY = 2
+# Matches the websocket connect timeout so a hub on slow WiFi gets the full
+# window before XMPP is tried, while an unreachable one hands off no later.
+_TRANSPORT_FALLBACK_DELAY = 5
 
 _T = TypeVar("_T")
 _HubConnector = hubconnector_websocket.HubConnector | hubconnector_xmpp.HubConnector
