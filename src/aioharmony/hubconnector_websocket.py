@@ -85,8 +85,10 @@ class HubConnector:
         cancelled out.
         """
         # Close connections.
-        await self.hub_disconnect()
-        await self.async_close_session()
+        try:
+            await self.hub_disconnect()
+        finally:
+            await self.async_close_session()
 
     @property
     def _session(self):

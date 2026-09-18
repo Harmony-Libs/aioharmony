@@ -345,14 +345,19 @@ async def test_connect_transport_tries_websockets_first(
 
 async def test_connect_transport_falls_back_to_xmpp_when_websockets_refused(
     client: HarmonyClient,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     ws = _fake_connector(AsyncMock(return_value=False))
     xmpp = _fake_connector(AsyncMock(return_value=True))
     ws_cls, xmpp_cls, delay = _patch_connectors(ws, xmpp, delay=60)
-    with ws_cls, xmpp_cls, delay:
+    with ws_cls, xmpp_cls, delay, caplog.at_level(logging.WARNING, "aioharmony"):
         async with real_timeout(1):
             assert await client._connect_transport() is True  # noqa: SLF001
     assert client.protocol == XMPP
+    assert any(
+        "Using XMPP because WEBSOCKETS did not connect" in r.message
+        for r in caplog.records
+    )
     assert client._hub_connection is xmpp  # noqa: SLF001
     ws.close.assert_awaited_once()
     xmpp.close.assert_not_awaited()
@@ -510,14 +515,35 @@ async def test_connect_transport_closes_losers_outside_the_timeout(
 
 async def test_connect_transport_treats_timeout_as_failure(
     client: HarmonyClient,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     ws = _fake_connector(AsyncMock(side_effect=aioexc.TimeOut))
     xmpp = _fake_connector(AsyncMock(return_value=True))
     ws_cls, xmpp_cls, delay = _patch_connectors(ws, xmpp)
-    with ws_cls, xmpp_cls, delay:
+    with ws_cls, xmpp_cls, delay, caplog.at_level(logging.DEBUG, "aioharmony"):
         assert await client._connect_transport() is True  # noqa: SLF001
     assert client.protocol == XMPP
     ws.close.assert_awaited_once()
+    timeouts = [
+        r for r in caplog.records if "WEBSOCKETS connect timed out" in r.message
+    ]
+    assert [r.levelno for r in timeouts] == [logging.DEBUG]
+
+
+async def test_connect_transport_logs_explicit_protocol_timeout_as_error(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    client = _make_client(protocol=XMPP)
+    ws = _fake_connector(AsyncMock(return_value=True))
+    xmpp = _fake_connector(AsyncMock(side_effect=aioexc.TimeOut))
+    ws_cls, xmpp_cls, delay = _patch_connectors(ws, xmpp)
+    try:
+        with ws_cls, xmpp_cls, delay, caplog.at_level(logging.DEBUG, "aioharmony"):
+            assert await client._connect_transport() is False  # noqa: SLF001
+    finally:
+        await client._callback_handler.close()  # noqa: SLF001
+    timeouts = [r for r in caplog.records if "XMPP connect timed out" in r.message]
+    assert [r.levelno for r in timeouts] == [logging.ERROR]
 
 
 async def test_connect_transport_returns_false_when_all_fail(

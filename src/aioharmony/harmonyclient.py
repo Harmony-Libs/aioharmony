@@ -208,6 +208,12 @@ class HarmonyClient:
             try:
                 connected = await connector.hub_connect(is_reconnect=quiet)
             except aioexc.TimeOut:
+                _LOGGER.log(
+                    logging.DEBUG if quiet else logging.ERROR,
+                    "%s: %s connect timed out",
+                    self.name,
+                    protocol,
+                )
                 connected = False
             except Exception:
                 _LOGGER.exception("%s: %s connect failed", self.name, protocol)
@@ -247,6 +253,13 @@ class HarmonyClient:
             )
             return False
 
+        if winner != protocols[0]:
+            _LOGGER.warning(
+                "%s: Using %s because %s did not connect",
+                self.name,
+                winner,
+                protocols[0],
+            )
         _LOGGER.debug("%s: Using %s", self.name, winner)
         return True
 

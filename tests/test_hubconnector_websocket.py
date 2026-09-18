@@ -328,6 +328,17 @@ async def test_close_disconnects_and_closes_session() -> None:
     connector.async_close_session.assert_awaited_once()
 
 
+async def test_close_closes_session_even_when_disconnect_raises() -> None:
+    connector = _make_connector()
+    connector.hub_disconnect = AsyncMock(side_effect=RuntimeError("boom"))  # type: ignore[method-assign]
+    connector.async_close_session = AsyncMock()  # type: ignore[method-assign]
+
+    with pytest.raises(RuntimeError):
+        await connector.close()
+
+    connector.async_close_session.assert_awaited_once()
+
+
 async def test_hub_post_logs_connection_errors_at_debug(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
