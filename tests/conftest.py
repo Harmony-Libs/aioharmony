@@ -2,9 +2,38 @@
 
 from __future__ import annotations
 
+import ssl
+from collections.abc import Iterator
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from blockbuster import BlockBuster, BlockBusterFunction, blockbuster_ctx
+
+_SSL_CONTEXT_BLOCKING_FUNCS = (
+    "load_default_certs",
+    "load_verify_locations",
+    "load_cert_chain",
+    "set_default_verify_paths",
+)
+
+
+@pytest.fixture(autouse=True)
+def blockbuster() -> Iterator[BlockBuster]:
+    """Fail any test that makes a blocking call from inside the event loop."""
+    # Stock blockbuster only patches SSLSocket read/write; the SSLContext
+    # loaders do hidden file I/O and CPU-bound cert parsing too.
+    ssl_context_functions = [
+        BlockBusterFunction(ssl.SSLContext, func_name, scanned_modules="aioharmony")
+        for func_name in _SSL_CONTEXT_BLOCKING_FUNCS
+    ]
+    with blockbuster_ctx("aioharmony") as bb:
+        for ssl_fn in ssl_context_functions:
+            ssl_fn.activate()
+        try:
+            yield bb
+        finally:
+            for ssl_fn in ssl_context_functions:
+                ssl_fn.deactivate()
 
 
 @pytest.fixture

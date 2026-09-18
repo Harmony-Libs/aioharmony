@@ -444,44 +444,39 @@ async def test_execute_per_hub_no_func_attr_just_waits(
     mock_client.close.assert_awaited()
 
 
-async def test_run_invalid_wait(
+def test_parse_args_invalid_wait(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     monkeypatch.setattr(
         "sys.argv",
         ["aioharmony", "--harmony_ip", "10.0.0.5", "--wait", "-5", "show_config"],
     )
-    await cli.run()
+    assert cli.parse_args() is None
     assert "Invalid value provided for --wait" in capsys.readouterr().out
 
 
-async def test_run_discover_branch_returns(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr("sys.argv", ["aioharmony", "--discover"])
-    await cli.run()
-
-
-async def test_run_no_func_prints_help(
+def test_parse_args_no_func_prints_help(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     monkeypatch.setattr("sys.argv", ["aioharmony", "--harmony_ip", "10.0.0.5"])
-    await cli.run()
+    assert cli.parse_args() is None
     assert "usage:" in capsys.readouterr().out.lower()
 
 
-async def test_run_with_logmodules(monkeypatch: pytest.MonkeyPatch) -> None:
-    called: dict[str, object] = {}
+def test_parse_args_discover(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("sys.argv", ["aioharmony", "--discover"])
+    args = cli.parse_args()
+    assert args is not None
+    assert args.discover is True
 
-    async def fake_execute(hub: str, args: SimpleNamespace) -> None:
-        called["hub"] = hub
-        called["wait"] = args.wait
 
-    monkeypatch.setattr(cli, "execute_per_hub", fake_execute)
+def test_parse_args_returns_namespace(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "sys.argv",
         [
             "aioharmony",
             "--harmony_ip",
-            "10.0.0.5",
+            "10.0.0.5,10.0.0.6",
             "--logmodules",
             "aioharmony,other",
             "--loglevel",
@@ -489,8 +484,33 @@ async def test_run_with_logmodules(monkeypatch: pytest.MonkeyPatch) -> None:
             "show_config",
         ],
     )
-    await cli.run()
-    assert called["hub"] == "10.0.0.5"
+    args = cli.parse_args()
+    assert args is not None
+    assert args.harmony_ip == "10.0.0.5,10.0.0.6"
+    assert args.loglevel == "DEBUG"
+    assert args.logmodules == "aioharmony,other"
+    assert args.func is cli.show_config
+
+
+def test_setup_logging_with_logmodules() -> None:
+    cli.setup_logging(_make_args(loglevel="DEBUG", logmodules="aioharmony,other"))
+    root = logging.getLogger()
+    assert root.level == logging.DEBUG
+    assert any(isinstance(f, cli.LoggingFilter) for f in root.handlers[-1].filters)
+
+
+def test_setup_logging_without_logmodules() -> None:
+    cli.setup_logging(_make_args(loglevel="INFO"))
+    root = logging.getLogger()
+    assert root.level == logging.INFO
+    assert root.handlers[-1].filters == []
+
+
+async def test_run_discover_branch_returns(monkeypatch: pytest.MonkeyPatch) -> None:
+    execute = AsyncMock()
+    monkeypatch.setattr(cli, "execute_per_hub", execute)
+    await cli.run(_make_args(discover=True))
+    execute.assert_not_awaited()
 
 
 async def test_run_dispatches_per_hub(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -500,16 +520,7 @@ async def test_run_dispatches_per_hub(monkeypatch: pytest.MonkeyPatch) -> None:
         seen.append(hub)
 
     monkeypatch.setattr(cli, "execute_per_hub", fake_execute)
-    monkeypatch.setattr(
-        "sys.argv",
-        [
-            "aioharmony",
-            "--harmony_ip",
-            "10.0.0.5,10.0.0.6",
-            "show_config",
-        ],
-    )
-    await cli.run()
+    await cli.run(_make_args(harmony_ip="10.0.0.5,10.0.0.6"))
     assert seen == ["10.0.0.5", "10.0.0.6"]
 
 
@@ -521,32 +532,45 @@ async def test_run_reraises_exception(monkeypatch: pytest.MonkeyPatch) -> None:
         raise CustomError
 
     monkeypatch.setattr(cli, "execute_per_hub", fake_execute)
-    monkeypatch.setattr(
-        "sys.argv",
-        ["aioharmony", "--harmony_ip", "10.0.0.5", "show_config"],
-    )
     with pytest.raises(CustomError):
-        await cli.run()
+        await cli.run(_make_args())
 
 
 def test_main_runs_and_closes(monkeypatch: pytest.MonkeyPatch) -> None:
-    ran: dict[str, bool] = {}
+    ran: dict[str, object] = {}
 
-    async def fake_run() -> None:
-        ran["yes"] = True
+    async def fake_run(args: SimpleNamespace) -> None:
+        ran["hub"] = args.harmony_ip
 
+    monkeypatch.setattr(
+        "sys.argv", ["aioharmony", "--harmony_ip", "10.0.0.5", "show_config"]
+    )
     monkeypatch.setattr(cli, "run", fake_run)
     monkeypatch.setattr(cli, "cancel_tasks", lambda _loop: None)
     cli.main()
-    assert ran == {"yes": True}
+    assert ran == {"hub": "10.0.0.5"}
+
+
+def test_main_returns_without_args(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    run = AsyncMock()
+    monkeypatch.setattr("sys.argv", ["aioharmony", "--harmony_ip", "10.0.0.5"])
+    monkeypatch.setattr(cli, "run", run)
+    cli.main()
+    run.assert_not_called()
+    assert "usage:" in capsys.readouterr().out.lower()
 
 
 def test_main_handles_keyboard_interrupt(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    async def boom() -> None:
+    async def boom(_args: SimpleNamespace) -> None:
         raise KeyboardInterrupt
 
+    monkeypatch.setattr(
+        "sys.argv", ["aioharmony", "--harmony_ip", "10.0.0.5", "show_config"]
+    )
     monkeypatch.setattr(cli, "run", boom)
     monkeypatch.setattr(cli, "cancel_tasks", lambda _loop: None)
     cli.main()

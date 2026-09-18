@@ -40,6 +40,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "blockbuster" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
     { name = "pytest-cov" },
@@ -54,6 +55,7 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "blockbuster", specifier = ">=1.5.5,<1.6" },
     { name = "pytest", specifier = ">=8,<10" },
     { name = "pytest-asyncio", specifier = ">=0.25.2" },
     { name = "pytest-cov", specifier = ">=6,<8" },
@@ -237,6 +239,18 @@ wheels = [
 ]
 
 [[package]]
+name = "blockbuster"
+version = "1.5.28"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "forbiddenfruit", marker = "implementation_name == 'cpython'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/28/14/de0062a8e3758fe1880729c1828196e6e951b8cd3299dfdd1e68aeae6e63/blockbuster-1.5.28.tar.gz", hash = "sha256:5af2ed9de6c874339a76cc831d1d11db79800a974573580e52ad827a70803482", size = 98235, upload-time = "2026-09-18T10:51:11.263Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/03/a0/cbcd90a4878416a658ff1eacb8aaf46816508b0e32f45a6ea901e8bc312c/blockbuster-1.5.28-py3-none-any.whl", hash = "sha256:efd26ab08979d6ce904defa3db2b6b218a5672ad535d386a6bac781242db4e07", size = 13670, upload-time = "2026-09-18T10:51:09.963Z" },
+]
+
+[[package]]
 name = "cffi"
 version = "1.17.1"
 source = { registry = "https://pypi.org/simple" }
@@ -374,6 +388,12 @@ sdist = { url = "https://files.pythonhosted.org/packages/09/35/2495c4ac46b980e4c
 wheels = [
     { url = "https://files.pythonhosted.org/packages/02/cc/b7e31358aac6ed1ef2bb790a9746ac2c69bcb3c8588b41616914eb106eaf/exceptiongroup-1.2.2-py3-none-any.whl", hash = "sha256:3111b9d131c238bec2f8f516e123e14ba243563fb135d3fe885990585aa7795b", size = 16453, upload-time = "2024-07-12T22:25:58.476Z" },
 ]
+
+[[package]]
+name = "forbiddenfruit"
+version = "0.1.4"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/e6/79/d4f20e91327c98096d605646bdc6a5ffedae820f38d378d3515c42ec5e60/forbiddenfruit-0.1.4.tar.gz", hash = "sha256:e3f7e66561a29ae129aac139a85d610dbf3dd896128187ed5454b6421f624253", size = 43756, upload-time = "2021-01-16T21:03:35.401Z" }
 
 [[package]]
 name = "frozenlist"
