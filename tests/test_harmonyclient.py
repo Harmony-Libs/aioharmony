@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import sys
 from collections.abc import AsyncGenerator
 from typing import Any
@@ -335,9 +334,8 @@ async def test_connect_transport_starts_xmpp_after_fallback_delay(
 ) -> None:
     ws = _fake_connector(_hanging())
     xmpp = _fake_connector(AsyncMock(return_value=True))
-    with contextlib.ExitStack() as stack:
-        for ctx in _patch_connectors(ws, xmpp):
-            stack.enter_context(ctx)
+    ws_cls, xmpp_cls, delay = _patch_connectors(ws, xmpp)
+    with ws_cls, xmpp_cls, delay:
         assert await client._connect_transport() is True  # noqa: SLF001
     assert client.protocol == XMPP
     ws.close.assert_awaited_once()
@@ -350,9 +348,8 @@ async def test_connect_transport_keeps_websockets_when_xmpp_fails(
     release = asyncio.Event()
     ws = _fake_connector(_hanging(release))
     xmpp = _fake_connector(AsyncMock(return_value=False))
-    with contextlib.ExitStack() as stack:
-        for ctx in _patch_connectors(ws, xmpp):
-            stack.enter_context(ctx)
+    ws_cls, xmpp_cls, delay = _patch_connectors(ws, xmpp)
+    with ws_cls, xmpp_cls, delay:
         asyncio.get_running_loop().call_later(0.05, release.set)
         assert await client._connect_transport() is True  # noqa: SLF001
     assert client.protocol == WEBSOCKETS
@@ -371,9 +368,8 @@ async def test_connect_transport_prefers_websockets_when_both_succeed(
         return True
 
     xmpp = _fake_connector(AsyncMock(side_effect=_xmpp_connects))
-    with contextlib.ExitStack() as stack:
-        for ctx in _patch_connectors(ws, xmpp):
-            stack.enter_context(ctx)
+    ws_cls, xmpp_cls, delay = _patch_connectors(ws, xmpp)
+    with ws_cls, xmpp_cls, delay:
         assert await client._connect_transport() is True  # noqa: SLF001
     assert client.protocol == WEBSOCKETS
     xmpp.close.assert_awaited_once()
@@ -385,9 +381,8 @@ async def test_connect_transport_treats_timeout_as_failure(
 ) -> None:
     ws = _fake_connector(AsyncMock(side_effect=aioexc.TimeOut))
     xmpp = _fake_connector(AsyncMock(return_value=True))
-    with contextlib.ExitStack() as stack:
-        for ctx in _patch_connectors(ws, xmpp):
-            stack.enter_context(ctx)
+    ws_cls, xmpp_cls, delay = _patch_connectors(ws, xmpp)
+    with ws_cls, xmpp_cls, delay:
         assert await client._connect_transport() is True  # noqa: SLF001
     assert client.protocol == XMPP
     ws.close.assert_awaited_once()
@@ -398,9 +393,8 @@ async def test_connect_transport_returns_false_when_all_fail(
 ) -> None:
     ws = _fake_connector(AsyncMock(return_value=False))
     xmpp = _fake_connector(AsyncMock(return_value=False))
-    with contextlib.ExitStack() as stack:
-        for ctx in _patch_connectors(ws, xmpp):
-            stack.enter_context(ctx)
+    ws_cls, xmpp_cls, delay = _patch_connectors(ws, xmpp)
+    with ws_cls, xmpp_cls, delay:
         assert await client._connect_transport() is False  # noqa: SLF001
     assert client.protocol is None
     assert client._hub_connection is None  # noqa: SLF001
@@ -413,12 +407,15 @@ async def test_connect_times_out_and_closes_both_attempts(
 ) -> None:
     ws = _fake_connector(_hanging())
     xmpp = _fake_connector(_hanging())
-    with contextlib.ExitStack() as stack:
-        for ctx in _patch_connectors(ws, xmpp):
-            stack.enter_context(ctx)
-        stack.enter_context(patch("aioharmony.harmonyclient.DEFAULT_TIMEOUT", 0.05))
-        with pytest.raises(aioexc.TimeOut):
-            await client.connect()
+    ws_cls, xmpp_cls, delay = _patch_connectors(ws, xmpp)
+    with (
+        ws_cls,
+        xmpp_cls,
+        delay,
+        patch("aioharmony.harmonyclient.DEFAULT_TIMEOUT", 0.05),
+        pytest.raises(aioexc.TimeOut),
+    ):
+        await client.connect()
     assert client._hub_connection is None  # noqa: SLF001
     ws.close.assert_awaited_once()
     xmpp.close.assert_awaited_once()

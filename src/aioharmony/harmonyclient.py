@@ -43,67 +43,41 @@ DEFAULT_TIMEOUT = 60
 _TRANSPORT_FALLBACK_DELAY = 2
 
 _T = TypeVar("_T")
+_HubConnector = hubconnector_websocket.HubConnector | hubconnector_xmpp.HubConnector
 
 
-class _TransportUnavailable(Exception):
-    """Raised when a transport could not connect to the hub."""
-
-
-def _set_result(future: asyncio.Future[None]) -> None:
-    if not future.done():
-        future.set_result(None)
+def _take_winner(tasks: list[asyncio.Task[_T | None]], done: set) -> _T | None:
+    # Walk in start order so the preferred transport wins a tie.
+    for task in list(tasks):
+        if task in done:
+            tasks.remove(task)
+            if (winner := task.result()) is not None:
+                return winner
+    return None
 
 
 async def _staggered_race(
-    coro_fns: Sequence[Callable[[], Awaitable[_T]]], delay: float
+    coro_fns: Sequence[Callable[[], Awaitable[_T | None]]], delay: float
 ) -> _T | None:
-    """Start coroutines staggered by delay and return the first success.
+    """Start coroutines staggered by delay and return the first non-None result.
 
-    A coroutine that raises counts as failed and starts the next one at once.
+    A coroutine returning None counts as failed and starts the next one at once.
     Remaining coroutines are cancelled once one succeeds.
     """
-    loop = asyncio.get_running_loop()
-    tasks: list[asyncio.Task[tuple[_T] | None]] = []
-    timer: asyncio.TimerHandle | None = None
-
-    async def run_one(
-        coro_fn: Callable[[], Awaitable[_T]], start_next: asyncio.Future[None]
-    ) -> tuple[_T] | None:
-        try:
-            result = await coro_fn()
-        except Exception:
-            _set_result(start_next)
-            return None
-        return (result,)
-
-    def take_winner(done: set[asyncio.Future]) -> tuple[_T] | None:
-        # Walk in start order so the preferred transport wins a tie.
-        for task in list(tasks):
-            if task in done:
-                tasks.remove(task)
-                if (winner := task.result()) is not None:
-                    return winner
-        return None
-
+    tasks: list[asyncio.Task[_T | None]] = []
     try:
         for coro_fn in coro_fns:
-            start_next: asyncio.Future[None] = loop.create_future()
-            tasks.append(loop.create_task(run_one(coro_fn, start_next)))
-            timer = loop.call_later(delay, _set_result, start_next)
-            while not start_next.done():
-                done, _ = await asyncio.wait(
-                    {*tasks, start_next}, return_when=asyncio.FIRST_COMPLETED
-                )
-                if winner := take_winner(done):
-                    return winner[0]
-            timer.cancel()
+            tasks.append(asyncio.create_task(coro_fn()))
+            done, _ = await asyncio.wait(
+                tasks, timeout=delay, return_when=asyncio.FIRST_COMPLETED
+            )
+            if (winner := _take_winner(tasks, done)) is not None:
+                return winner
         while tasks:
             done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
-            if winner := take_winner(done):
-                return winner[0]
+            if (winner := _take_winner(tasks, done)) is not None:
+                return winner
     finally:
-        if timer is not None:
-            timer.cancel()
         for task in tasks:
             task.cancel()
         for task in tasks:
@@ -208,9 +182,7 @@ class HarmonyClient:
     def current_activity_id(self):
         return self._current_activity_id
 
-    def _new_connector(
-        self, protocol: str
-    ) -> hubconnector_websocket.HubConnector | hubconnector_xmpp.HubConnector:
+    def _new_connector(self, protocol: str) -> _HubConnector:
         module = hubconnector_websocket if protocol == WEBSOCKETS else hubconnector_xmpp
         return module.HubConnector(
             ip_address=self._ip_address,
@@ -221,17 +193,15 @@ class HarmonyClient:
     async def _connect_transport(self) -> bool:
         """Connect over websockets, falling back to XMPP, and keep the winner."""
         protocols = [self._protocol] if self._protocol else [WEBSOCKETS, XMPP]
-        connectors: dict[str, object] = {}
+        connectors: dict[str, _HubConnector] = {}
 
-        async def attempt(protocol: str) -> str:
+        async def attempt(protocol: str) -> str | None:
             connector = connectors[protocol] = self._new_connector(protocol)
             try:
                 connected = await connector.hub_connect()
             except aioexc.TimeOut:
                 connected = False
-            if not connected:
-                raise _TransportUnavailable(protocol)
-            return protocol
+            return protocol if connected else None
 
         winner = None
         try:
@@ -240,9 +210,9 @@ class HarmonyClient:
                 _TRANSPORT_FALLBACK_DELAY,
             )
         finally:
-            for protocol, connector in connectors.items():
-                if protocol != winner:
-                    await connector.close()
+            await asyncio.gather(
+                *(c.close() for p, c in connectors.items() if p != winner)
+            )
 
         if winner is None:
             _LOGGER.debug("%s: Unable to connect using %s", self.name, protocols)
