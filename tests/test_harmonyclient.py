@@ -488,6 +488,30 @@ async def test_staggered_race_propagates_exception_and_cancels_the_rest() -> Non
     assert cancelled.is_set()
 
 
+async def test_connect_transport_closes_losers_outside_the_timeout(
+    client: HarmonyClient,
+) -> None:
+    release = asyncio.Event()
+    ws = _fake_connector(_hanging(release))
+    xmpp = _fake_connector(_hanging())
+
+    async def _slow_close() -> None:
+        await asyncio.sleep(0.1)
+
+    xmpp.close = AsyncMock(side_effect=_slow_close)
+    ws_cls, xmpp_cls, delay = _patch_connectors(ws, xmpp)
+    with (
+        ws_cls,
+        xmpp_cls,
+        delay,
+        patch("aioharmony.harmonyclient.DEFAULT_CONNECT_TIMEOUT", 0.05),
+    ):
+        asyncio.get_running_loop().call_later(0.02, release.set)
+        assert await client._connect_transport() is True  # noqa: SLF001
+    assert client._hub_connection is ws  # noqa: SLF001
+    xmpp.close.assert_awaited_once()
+
+
 async def test_connect_transport_treats_timeout_as_failure(
     client: HarmonyClient,
 ) -> None:
@@ -524,7 +548,7 @@ async def test_connect_times_out_and_closes_both_attempts(
         ws_cls,
         xmpp_cls,
         delay,
-        patch("aioharmony.harmonyclient.DEFAULT_TIMEOUT", 0.05),
+        patch("aioharmony.harmonyclient.DEFAULT_CONNECT_TIMEOUT", 0.05),
         pytest.raises(aioexc.TimeOut),
     ):
         await client.connect()
@@ -547,6 +571,8 @@ async def test_connect_transport_only_tries_explicit_protocol(protocol: str) -> 
     assert client.protocol == protocol
     assert ws_class.call_count == (protocol == WEBSOCKETS)
     assert xmpp_class.call_count == (protocol == XMPP)
+    winner = ws if protocol == WEBSOCKETS else xmpp
+    winner.hub_connect.assert_awaited_once_with(is_reconnect=False)
 
 
 def test_slixmpp_is_imported_with_the_client() -> None:

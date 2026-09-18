@@ -41,6 +41,7 @@ from aioharmony.responsehandler import Handler, ResponseHandler
 _LOGGER = logging.getLogger(__name__)
 
 DEFAULT_TIMEOUT = 60
+DEFAULT_CONNECT_TIMEOUT = 25
 # Seconds the websocket connect runs alone before XMPP is also attempted.
 _TRANSPORT_FALLBACK_DELAY = 2
 
@@ -195,12 +196,15 @@ class HarmonyClient:
         protocols = [self._protocol] if self._protocol else [WEBSOCKETS, XMPP]
         connectors: dict[str, _HubConnector] = {}
 
+        # is_reconnect only lowers the connector's failure logs to debug; a
+        # lost race is expected and reported once below, but an explicitly
+        # chosen transport keeps its detailed failure logs.
+        quiet = len(protocols) > 1
+
         async def attempt(protocol: str) -> str | None:
             connector = connectors[protocol] = self._new_connector(protocol)
             try:
-                # is_reconnect only lowers the connector's failure logs to
-                # debug; a lost race is expected and reported once below.
-                connected = await connector.hub_connect(is_reconnect=True)
+                connected = await connector.hub_connect(is_reconnect=quiet)
             except aioexc.TimeOut:
                 connected = False
             except Exception:
@@ -210,10 +214,11 @@ class HarmonyClient:
 
         winner = None
         try:
-            winner = await _staggered_race(
-                [partial(attempt, protocol) for protocol in protocols],
-                _TRANSPORT_FALLBACK_DELAY,
-            )
+            async with timeout(DEFAULT_CONNECT_TIMEOUT):
+                winner = await _staggered_race(
+                    [partial(attempt, protocol) for protocol in protocols],
+                    _TRANSPORT_FALLBACK_DELAY,
+                )
             if winner is not None:
                 self._protocol = winner
                 self._hub_connection = connectors[winner]
@@ -221,6 +226,8 @@ class HarmonyClient:
                     None, self._callbacks.disconnect
                 )
         finally:
+            # Outside the connect timeout so a slow loser teardown cannot
+            # fail a connect that already succeeded.
             losers = [c for p, c in connectors.items() if p != winner]
             for exc in await asyncio.gather(
                 *(c.close() for c in losers), return_exceptions=True
@@ -247,10 +254,10 @@ class HarmonyClient:
         :raises: :class:`~aioharmony.exceptions.TimeOut`
         """
         try:
-            async with timeout(DEFAULT_TIMEOUT):
-                if self._hub_connection is None:
-                    connected = await self._connect_transport()
-                else:
+            if self._hub_connection is None:
+                connected = await self._connect_transport()
+            else:
+                async with timeout(DEFAULT_CONNECT_TIMEOUT):
                     connected = await self._hub_connection.hub_connect()
         except asyncio.TimeoutError:
             raise aioexc.TimeOut

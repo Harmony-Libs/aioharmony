@@ -130,11 +130,13 @@ class HubConnector(slixmpp.ClientXMPP):
         """
         # Close connections.
         self.cancel_connection_attempt()
-        await self.hub_disconnect()
-        # A connect cancelled after slixmpp opened the stream leaves a
-        # transport that hub_disconnect skips because _connected was never set.
-        if self.transport is not None and not self._connected:
-            self.abort()
+        try:
+            await self.hub_disconnect()
+        finally:
+            # A stream that never reached the connected state, or whose
+            # graceful close timed out, is otherwise left open.
+            if self.transport is not None:
+                self.abort()
 
     async def hub_connect(self, is_reconnect: bool = False) -> bool:
         """Connect to Hub"""

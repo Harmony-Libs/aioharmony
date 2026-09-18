@@ -182,6 +182,16 @@ async def test_close_aborts_stream_opened_by_cancelled_connect() -> None:
     hub.abort.assert_called_once()
 
 
+async def test_close_aborts_when_graceful_disconnect_times_out() -> None:
+    hub = _make_hub()
+    hub.hub_disconnect = AsyncMock(side_effect=aioexc.TimeOut)  # type: ignore[method-assign]
+    hub.abort = MagicMock()  # type: ignore[method-assign]
+    hub.transport = MagicMock()
+    with pytest.raises(aioexc.TimeOut):
+        await hub.close()
+    hub.abort.assert_called_once()
+
+
 async def test_close_does_not_abort_without_transport() -> None:
     hub = _make_hub()
     hub.hub_disconnect = AsyncMock()  # type: ignore[method-assign]

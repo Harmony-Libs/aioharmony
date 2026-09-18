@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections import deque
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
@@ -339,10 +340,33 @@ async def test_hub_post_logs_connection_errors_at_debug(
     connector._aiohttp_session = session  # noqa: SLF001
 
     with caplog.at_level("DEBUG", logger="aioharmony.hubconnector_websocket"):
-        assert await connector.hub_post("http://10.0.0.1:8088/", {}) is None
+        assert (
+            await connector.hub_post(
+                "http://10.0.0.1:8088/", {}, log_level=logging.DEBUG
+            )
+            is None
+        )
 
     assert not [r for r in caplog.records if r.levelname == "ERROR"]
     assert any("Unable to connect for post" in r.message for r in caplog.records)
+
+
+async def test_hub_post_connection_errors_default_to_error_level(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Runtime posts keep error level for a refused connection."""
+    connector = _make_connector()
+    session = MagicMock()
+    session.post = MagicMock(side_effect=aiohttp.ServerTimeoutError("timeout"))
+    connector._aiohttp_session = session  # noqa: SLF001
+
+    with caplog.at_level("DEBUG", logger="aioharmony.hubconnector_websocket"):
+        assert await connector.hub_post("http://10.0.0.1:8088/", {}) is None
+
+    errors = [r for r in caplog.records if r.levelname == "ERROR"]
+    assert len(errors) == 1
+    assert "Unable to connect for post" in errors[0].message
+    assert errors[0].exc_info is None
 
 
 async def test_hub_post_keeps_error_level_for_mid_request_failures(

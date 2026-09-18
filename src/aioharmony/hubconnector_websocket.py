@@ -109,11 +109,11 @@ class HubConnector:
         )
         return self._aiohttp_session
 
-    async def get_remote_id(self) -> str | None:
+    async def get_remote_id(self, log_level: int = logging.ERROR) -> str | None:
         """Retrieve remote id from the HUB."""
         if self._remote_id is None:
             # We do not have the remoteId yet, get it first.
-            response = await self._retrieve_hub_info()
+            response = await self._retrieve_hub_info(log_level)
             if response is not None:
                 self._remote_id = response.get("activeRemoteId")
                 domain = urlparse(response.get("discoveryServer"))
@@ -144,7 +144,7 @@ class HubConnector:
 
             log_level = 10 if is_reconnect else 40
 
-            if await self.get_remote_id() is None:
+            if await self.get_remote_id(log_level) is None:
                 # No remote ID means no connect.
                 _LOGGER.log(
                     log_level, "%s: Unable to retrieve HUB id", self._ip_address
@@ -338,7 +338,9 @@ class HubConnector:
 
         return msgid
 
-    async def hub_post(self, url, json_request, headers=None) -> dict | None:
+    async def hub_post(
+        self, url, json_request, headers=None, log_level: int = logging.ERROR
+    ) -> dict | None:
         """Post a json request and return the response."""
         _LOGGER.debug("%s: Sending post request: %s", self._ip_address, json_request)
         try:
@@ -348,7 +350,9 @@ class HubConnector:
                 json_response = await response.json(content_type=None, loads=json_loads)
                 _LOGGER.debug("%s: Post response: %s", self._ip_address, json_response)
         except (aiohttp.ClientConnectorError, aiohttp.ServerTimeoutError) as exc:
-            _LOGGER.debug("%s: Unable to connect for post: %s", self._ip_address, exc)
+            _LOGGER.log(
+                log_level, "%s: Unable to connect for post: %s", self._ip_address, exc
+            )
         except aiohttp.ClientError:
             _LOGGER.exception("%s: Exception on post", self._ip_address)
         else:
@@ -452,7 +456,7 @@ class HubConnector:
         if not have_connection:
             await self._reconnect()
 
-    async def _retrieve_hub_info(self) -> dict | None:
+    async def _retrieve_hub_info(self, log_level: int = logging.ERROR) -> dict | None:
         """Retrieve the harmony Hub information."""
         _LOGGER.debug("%s: Retrieving Harmony Hub information.", self._ip_address)
 
@@ -465,7 +469,7 @@ class HubConnector:
         }
         json_request = {"id ": 1, "cmd": "setup.account?getProvisionInfo", "params": {}}
 
-        response = await self.hub_post(url, json_request, headers)
+        response = await self.hub_post(url, json_request, headers, log_level)
 
         if response is not None:
             return response.get("data")
