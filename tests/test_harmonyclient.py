@@ -1302,12 +1302,17 @@ async def test_refresh_info_from_hub_timeout_result_short_circuits(
 async def test_refresh_info_from_hub_returns_false_when_config_missing(
     client: HarmonyClient,
 ) -> None:
+    """A missing config returns False without firing config_updated."""
+    client._callbacks = client._callbacks._replace(config_updated=MagicMock())  # noqa: SLF001
     with (
         patch.object(client, "_get_config", AsyncMock(return_value=None)),
         patch.object(client, "_retrieve_hub_info", AsyncMock(return_value={})),
         patch.object(client, "_get_current_activity", AsyncMock(return_value=True)),
+        patch("aioharmony.harmonyclient.call_callback") as mock_call,
     ):
         assert await client.refresh_info_from_hub() is False
+
+    mock_call.assert_not_called()
 
 
 async def test_refresh_info_from_hub_other_exception_raises(

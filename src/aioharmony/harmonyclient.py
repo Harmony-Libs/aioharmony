@@ -318,6 +318,11 @@ class HarmonyClient:
                 )
 
         if results[1] is not True:
+            _LOGGER.warning(
+                "%s: Unable to load HUB configuration, will retry on next "
+                "configuration notification",
+                self.name,
+            )
             # Leave the version unknown so the next state notification
             # retries the config refresh.
             self._hub_config = self._hub_config._replace(config_version=None)
@@ -417,8 +422,9 @@ class HarmonyClient:
 
             await self._get_current_activity()
 
+        config_loaded = results[0] is not None
         # If we were provided a callback handler then call it now.
-        if self._callbacks.config_updated:
+        if config_loaded and self._callbacks.config_updated:
             _LOGGER.debug("%s: Calling callback handler for config_updated", self.name)
             call_callback(
                 callback_handler=self._callbacks.config_updated,
@@ -426,7 +432,7 @@ class HarmonyClient:
                 callback_uuid=self._ip_address,
                 callback_name="config_updated_callback",
             )
-        return results[0] is not None
+        return config_loaded
 
     async def _get_config(self) -> dict | None:
         """Retrieves the Harmony device configuration.
@@ -453,6 +459,11 @@ class HarmonyClient:
 
         if not response:
             # There was an issue
+            _LOGGER.error(
+                "%s: No response received trying to get configuration for %s",
+                self.name,
+                self._ip_address,
+            )
             return None
 
         if response.get("code") != 200:
@@ -750,6 +761,12 @@ class HarmonyClient:
                         and self._hub_config.config_version
                         == current_hub_config_version
                     ):
+                        _LOGGER.warning(
+                            "%s: HUB configuration refresh for version %s failed,"
+                            " will retry on next notification",
+                            self.name,
+                            current_hub_config_version,
+                        )
                         self._hub_config = self._hub_config._replace(
                             config_version=previous_config_version
                         )
