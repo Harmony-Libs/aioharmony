@@ -288,6 +288,7 @@ class HarmonyClient:
             self.refresh_info_from_hub(),
             return_exceptions=True,
         )
+        synced_config_version = None
         for idx, result in enumerate(results):
             if isinstance(result, Exception):
                 if not isinstance(result, aioexc.TimeOut):
@@ -301,8 +302,9 @@ class HarmonyClient:
             if idx == 0:
                 resp_data = result.get("data")
                 if resp_data is not None:
+                    synced_config_version = resp_data.get("configVersion")
                     self._hub_config = self._hub_config._replace(
-                        config_version=resp_data.get("configVersion")
+                        config_version=synced_config_version
                     )
                     self._hub_config = self._hub_config._replace(hub_state=resp_data)
                     _LOGGER.debug(
@@ -317,7 +319,12 @@ class HarmonyClient:
                     self._hub_config.info.get("activeRemoteId"),
                 )
 
-        if results[1] is not True:
+        # A concurrent notification may have moved the version on and loaded
+        # the config itself; only clear the version this call set.
+        if (
+            results[1] is not True
+            and self._hub_config.config_version == synced_config_version
+        ):
             _LOGGER.warning(
                 "%s: Unable to load HUB configuration, will retry on next "
                 "configuration notification",
@@ -389,7 +396,7 @@ class HarmonyClient:
             raise aioexc.TimeOut
 
     async def refresh_info_from_hub(self) -> bool:
-        """Retrieve config and hub info; return True if the config was loaded."""
+        """Retrieve config and hub info; True only if the full refresh succeeded."""
         _LOGGER.debug("%s: Retrieving HUB information", self.name)
 
         async with self._sync_lck:
