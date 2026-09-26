@@ -317,6 +317,11 @@ class HarmonyClient:
                     self._hub_config.info.get("activeRemoteId"),
                 )
 
+        if results[1] is not True:
+            # Leave the version unknown so the next state notification
+            # retries the config refresh.
+            self._hub_config = self._hub_config._replace(config_version=None)
+
         if (
             self._hub_connection.callbacks.connect is None
             and self._callbacks.connect is not None
@@ -378,7 +383,8 @@ class HarmonyClient:
         except asyncio.TimeoutError:
             raise aioexc.TimeOut
 
-    async def refresh_info_from_hub(self) -> None:
+    async def refresh_info_from_hub(self) -> bool:
+        """Retrieve config and hub info; return True if the config was loaded."""
         _LOGGER.debug("%s: Retrieving HUB information", self.name)
 
         async with self._sync_lck:
@@ -404,7 +410,7 @@ class HarmonyClient:
                     _LOGGER.error(
                         "%s: Timeout trying to retrieve %s.", self.name, result_name
                     )
-                    return
+                    return False
                 if isinstance(result, Exception):
                     # Other exception, raise it.
                     raise result
@@ -420,6 +426,7 @@ class HarmonyClient:
                 callback_uuid=self._ip_address,
                 callback_name="config_updated_callback",
             )
+        return results[0] is not None
 
     async def _get_config(self) -> dict | None:
         """Retrieves the Harmony device configuration.
@@ -728,11 +735,24 @@ class HarmonyClient:
                     self._hub_config.config_version,
                     current_hub_config_version,
                 )
+                previous_config_version = self._hub_config.config_version
                 self._hub_config = self._hub_config._replace(
                     config_version=current_hub_config_version
                 )
                 # Get all the HUB information.
-                await self.refresh_info_from_hub()
+                refreshed = False
+                try:
+                    refreshed = await self.refresh_info_from_hub()
+                finally:
+                    # Roll back so the next notification retries the refresh.
+                    if (
+                        not refreshed
+                        and self._hub_config.config_version
+                        == current_hub_config_version
+                    ):
+                        self._hub_config = self._hub_config._replace(
+                            config_version=previous_config_version
+                        )
 
     # pylint: disable=broad-except
     async def _update_activity_callback(self, message: dict = None) -> None:
