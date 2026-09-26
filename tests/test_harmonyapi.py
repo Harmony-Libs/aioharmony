@@ -369,3 +369,41 @@ async def test_change_channel_returns_false_on_bad_code(
     instance, _ = api
     fake_client.send_to_hub.return_value = {"code": 500}
     assert await instance.change_channel(42) is False
+
+
+async def test_set_sleep_timer_success(api: ApiFixture, fake_client: MagicMock) -> None:
+    instance, _ = api
+    fake_client.send_to_hub.return_value = {"code": 200}
+    assert await instance.set_sleep_timer(300) is True
+    fake_client.send_to_hub.assert_awaited_once_with(
+        command="set_sleep_timer",
+        params={"interval": 300},
+    )
+
+
+async def test_set_sleep_timer_cancel_with_zero(
+    api: ApiFixture, fake_client: MagicMock
+) -> None:
+    instance, _ = api
+    fake_client.send_to_hub.return_value = {"code": 200}
+    assert await instance.set_sleep_timer(0) is True
+    fake_client.send_to_hub.assert_awaited_once_with(
+        command="set_sleep_timer",
+        params={"interval": 0},
+    )
+
+
+async def test_set_sleep_timer_returns_false_on_empty_response(
+    api: ApiFixture, fake_client: MagicMock
+) -> None:
+    instance, _ = api
+    fake_client.send_to_hub.return_value = None
+    assert await instance.set_sleep_timer(60) is False
+
+
+async def test_set_sleep_timer_returns_false_on_bad_code(
+    api: ApiFixture, fake_client: MagicMock
+) -> None:
+    instance, _ = api
+    fake_client.send_to_hub.return_value = {"code": 500}
+    assert await instance.set_sleep_timer(60) is False
