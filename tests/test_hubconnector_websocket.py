@@ -5,14 +5,17 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections import deque
+from collections.abc import AsyncIterator
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import aiohttp
 import pytest
+from aiohttp import web
 from multidict import CIMultiDict
 from yarl import URL
 
+from aioharmony import hubconnector_websocket
 from aioharmony.const import ConnectorCallbackType
 from aioharmony.hubconnector_websocket import HubConnector
 
@@ -552,6 +555,105 @@ async def test_hub_connect_handles_handshake_error_with_status(
 
     assert connector._websocket is None  # noqa: SLF001
     assert any("Invalid status code 401" in r.message for r in caplog.records)
+
+
+@pytest.fixture
+async def silent_hub(
+    monkeypatch: pytest.MonkeyPatch,
+) -> AsyncIterator[HubConnector]:
+    """Connector pointed at a local server that accepts but never answers."""
+    held: list[asyncio.StreamWriter] = []
+
+    async def _accept_and_hang(
+        _reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+    ) -> None:
+        held.append(writer)
+
+    server = await asyncio.start_server(_accept_and_hang, "127.0.0.1", 0)
+    port = server.sockets[0].getsockname()[1]
+    monkeypatch.setattr("aioharmony.hubconnector_websocket.DEFAULT_HUB_PORT", port)
+    monkeypatch.setattr("aioharmony.hubconnector_websocket.DEFAULT_TIMEOUT", 0.2)
+
+    connector = HubConnector(
+        ip_address="127.0.0.1",
+        response_queue=asyncio.Queue(),
+        callbacks=ConnectorCallbackType(connect=None, disconnect=None),
+    )
+    connector._remote_id = "abc"  # noqa: SLF001
+
+    yield connector
+
+    await connector.async_close_session()
+    for writer in held:
+        writer.close()
+    server.close()
+    await server.wait_closed()
+
+
+async def test_hub_connect_times_out_when_hub_never_answers_upgrade(
+    silent_hub: HubConnector,
+) -> None:
+    """hub_connect gives up when the hub accepts TCP but never answers."""
+    assert await asyncio.wait_for(silent_hub.hub_connect(), timeout=5) is False
+    assert silent_hub._websocket is None  # noqa: SLF001
+    assert not silent_hub._connect_disconnect_lock.locked()  # noqa: SLF001
+
+
+async def test_hub_post_times_out_when_hub_never_answers(
+    silent_hub: HubConnector,
+) -> None:
+    """hub_post gives up when the hub accepts TCP but never answers."""
+    url = f"http://127.0.0.1:{hubconnector_websocket.DEFAULT_HUB_PORT}/"
+
+    assert await asyncio.wait_for(silent_hub.hub_post(url, {}), timeout=5) is None
+
+
+async def test_idle_websocket_outlives_read_timeout(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An upgraded websocket stays open while idle past the session read timeout."""
+    upgrades = 0
+
+    async def _send_late(request: web.Request) -> web.WebSocketResponse:
+        nonlocal upgrades
+        upgrades += 1
+        websocket = web.WebSocketResponse()
+        await websocket.prepare(request)
+        if upgrades == 1:
+            loop = asyncio.get_running_loop()
+            idle: asyncio.Future[None] = loop.create_future()
+            loop.call_later(0.6, idle.set_result, None)
+            await idle
+            await websocket.send_str('{"hello":"world"}')
+        async for _message in websocket:
+            pass
+        return websocket
+
+    app = web.Application()
+    app.router.add_get("/", _send_late)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(runner, "127.0.0.1", 0)
+    await site.start()
+    port = runner.addresses[0][1]
+    monkeypatch.setattr("aioharmony.hubconnector_websocket.DEFAULT_HUB_PORT", port)
+    monkeypatch.setattr("aioharmony.hubconnector_websocket.DEFAULT_TIMEOUT", 0.2)
+
+    queue: asyncio.Queue = asyncio.Queue()
+    connector = HubConnector(
+        ip_address="127.0.0.1",
+        response_queue=queue,
+        callbacks=ConnectorCallbackType(connect=None, disconnect=None),
+    )
+    connector._remote_id = "abc"  # noqa: SLF001
+
+    try:
+        assert await connector.hub_connect() is True
+        assert await asyncio.wait_for(queue.get(), timeout=5) == {"hello": "world"}
+        assert upgrades == 1
+    finally:
+        await connector.close()
+        await runner.cleanup()
 
 
 async def test_hub_connect_success_fires_callback_and_starts_listener() -> None:
