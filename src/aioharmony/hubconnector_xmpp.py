@@ -5,10 +5,10 @@ import contextlib
 import logging
 import ssl
 import sys
+from asyncio import timeout
 from uuid import uuid4
 
 import slixmpp
-from asyncio import timeout
 from slixmpp.exceptions import IqTimeout
 from slixmpp.xmlstream import ET
 from slixmpp.xmlstream.handler.callback import Callback
