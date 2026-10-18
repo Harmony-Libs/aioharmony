@@ -1094,12 +1094,27 @@ async def test_notification_callback_noop_when_version_unchanged(
     refresh.assert_not_awaited()
 
 
+def _refresh_mock(client: HarmonyClient, *results: bool) -> AsyncMock:
+    """Mock refresh_info_from_hub, bumping the config load count on success."""
+    results_iter = iter(results)
+
+    async def refresh() -> bool:
+        loaded = next(results_iter)
+        if loaded:
+            client._config_load_count += 1  # noqa: SLF001
+        return loaded
+
+    return AsyncMock(side_effect=refresh)
+
+
 async def test_notification_callback_refreshes_on_version_change(
     client: HarmonyClient,
 ) -> None:
     client._hub_config = client._hub_config._replace(config_version=7)  # noqa: SLF001
     message = {"data": {"configVersion": 8, "syncStatus": 2}}
-    with patch.object(client, "refresh_info_from_hub", AsyncMock()) as refresh:
+    with patch.object(
+        client, "refresh_info_from_hub", _refresh_mock(client, True)
+    ) as refresh:
         await client._notification_callback(message)  # noqa: SLF001
     refresh.assert_awaited_once()
     assert client.hub_config.config_version == 8
@@ -1112,7 +1127,7 @@ async def test_notification_callback_retries_after_failed_refresh(
     client._hub_config = client._hub_config._replace(config_version=7)  # noqa: SLF001
     message = {"data": {"configVersion": 8, "syncStatus": 2}}
     with patch.object(
-        client, "refresh_info_from_hub", AsyncMock(side_effect=[False, True])
+        client, "refresh_info_from_hub", _refresh_mock(client, False, True)
     ) as refresh:
         await client._notification_callback(message)  # noqa: SLF001
         assert client.hub_config.config_version == 7
@@ -1393,7 +1408,7 @@ async def test_connect_populates_hub_state_and_fires_connect_callback(
     state_response = {"data": {"configVersion": 42, "extra": "x"}}
     with (
         patch.object(client, "send_to_hub", AsyncMock(return_value=state_response)),
-        patch.object(client, "refresh_info_from_hub", AsyncMock(return_value=True)),
+        patch.object(client, "refresh_info_from_hub", _refresh_mock(client, True)),
         patch("aioharmony.harmonyclient.call_callback") as mock_call,
     ):
         result = await client.connect()
