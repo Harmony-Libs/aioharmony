@@ -1315,6 +1315,25 @@ async def test_refresh_info_from_hub_returns_false_when_config_missing(
     mock_call.assert_not_called()
 
 
+async def test_refresh_info_from_hub_hub_info_timeout_still_reports_config(
+    client: HarmonyClient,
+) -> None:
+    """A loaded config is reported even when hub info retrieval times out."""
+    client._callbacks = client._callbacks._replace(config_updated=MagicMock())  # noqa: SLF001
+    with (
+        patch.object(client, "_get_config", AsyncMock(return_value={"x": 1})),
+        patch.object(
+            client, "_retrieve_hub_info", AsyncMock(side_effect=aioexc.TimeOut)
+        ),
+        patch.object(client, "_get_current_activity", AsyncMock()) as gca,
+        patch("aioharmony.harmonyclient.call_callback") as mock_call,
+    ):
+        assert await client.refresh_info_from_hub() is True
+
+    gca.assert_not_awaited()
+    mock_call.assert_called_once()
+
+
 async def test_refresh_info_from_hub_other_exception_raises(
     client: HarmonyClient,
 ) -> None:
