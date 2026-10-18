@@ -9,13 +9,12 @@ this class allows one to query or send commands to the Hub.
 import asyncio
 import copy
 import logging
+from asyncio import timeout
 from collections.abc import Awaitable, Callable, Sequence
 from datetime import timedelta
 from functools import partial
 from typing import TypeVar
 from uuid import uuid4
-
-from async_timeout import timeout
 
 import aioharmony.exceptions as aioexc
 import aioharmony.handler as handlers
