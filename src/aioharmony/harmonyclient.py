@@ -132,6 +132,8 @@ class HarmonyClient:
 
         # Create the lock for getting HUB information.
         self._sync_lck = asyncio.Lock()
+        # Bumped on every successful config load.
+        self._config_load_count = 0
 
         # Create the activity start handler object when start activity is finished
         handler = copy.copy(handlers.HANDLER_START_ACTIVITY_FINISHED)
@@ -283,12 +285,12 @@ class HarmonyClient:
         # to receive the response and set our current config version
         # accordingly.
 
+        config_load_count = self._config_load_count
         results = await asyncio.gather(
             self.send_to_hub(command="get_current_state"),
             self.refresh_info_from_hub(),
             return_exceptions=True,
         )
-        synced_config_version = None
         for idx, result in enumerate(results):
             if isinstance(result, Exception):
                 if not isinstance(result, aioexc.TimeOut):
@@ -302,9 +304,8 @@ class HarmonyClient:
             if idx == 0:
                 resp_data = result.get("data")
                 if resp_data is not None:
-                    synced_config_version = resp_data.get("configVersion")
                     self._hub_config = self._hub_config._replace(
-                        config_version=synced_config_version
+                        config_version=resp_data.get("configVersion")
                     )
                     self._hub_config = self._hub_config._replace(hub_state=resp_data)
                     _LOGGER.debug(
@@ -319,12 +320,9 @@ class HarmonyClient:
                     self._hub_config.info.get("activeRemoteId"),
                 )
 
-        # A concurrent notification may have moved the version on and loaded
-        # the config itself; only clear the version this call set.
-        if (
-            results[1] is not True
-            and self._hub_config.config_version == synced_config_version
-        ):
+        # A concurrent notification refresh may have loaded the config even
+        # though this call's refresh failed.
+        if results[1] is not True and self._config_load_count == config_load_count:
             _LOGGER.warning(
                 "%s: Unable to load HUB configuration, will retry on next "
                 "configuration notification",
@@ -396,7 +394,7 @@ class HarmonyClient:
             raise aioexc.TimeOut
 
     async def refresh_info_from_hub(self) -> bool:
-        """Retrieve config and hub info; True only if the full refresh succeeded."""
+        """Retrieve config and hub info; True if the config was loaded."""
         _LOGGER.debug("%s: Retrieving HUB information", self.name)
 
         async with self._sync_lck:
@@ -430,6 +428,8 @@ class HarmonyClient:
             await self._get_current_activity()
 
         config_loaded = results[0] is not None
+        if config_loaded:
+            self._config_load_count += 1
         # If we were provided a callback handler then call it now.
         if config_loaded and self._callbacks.config_updated:
             _LOGGER.debug("%s: Calling callback handler for config_updated", self.name)

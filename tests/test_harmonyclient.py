@@ -1430,6 +1430,28 @@ async def test_connect_clears_config_version_when_config_not_loaded(
     assert client.hub_config.hub_state == state_response["data"]
 
 
+async def test_connect_keeps_config_version_when_concurrent_refresh_loaded(
+    client: HarmonyClient,
+) -> None:
+    """A config loaded by a concurrent refresh keeps config_version set."""
+    client._hub_connection = MagicMock()  # noqa: SLF001
+    client._hub_connection.hub_connect = AsyncMock(return_value=True)  # noqa: SLF001
+    client._hub_connection.callbacks = ConnectorCallbackType(None, None)  # noqa: SLF001
+
+    async def concurrent_refresh_loads_config() -> bool:
+        client._config_load_count += 1  # noqa: SLF001
+        return False
+
+    state_response = {"data": {"configVersion": 42}}
+    with (
+        patch.object(client, "send_to_hub", AsyncMock(return_value=state_response)),
+        patch.object(client, "refresh_info_from_hub", concurrent_refresh_loads_config),
+    ):
+        assert await client.connect() is True
+
+    assert client.hub_config.config_version == 42
+
+
 async def test_connect_reraises_unexpected_exception_from_send(
     client: HarmonyClient,
 ) -> None:
