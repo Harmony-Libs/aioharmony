@@ -105,7 +105,12 @@ class HubConnector:
             enable_cleanup_closed=True,
         )
 
-        session_timeout = aiohttp.ClientTimeout(connect=DEFAULT_TIMEOUT)
+        # Without sock_read, a hub that accepts TCP but never answers stalls
+        # ws_connect and hub_post forever. aiohttp drops the read timeout once
+        # the websocket upgrade succeeds, so the live connection is unaffected.
+        session_timeout = aiohttp.ClientTimeout(
+            connect=DEFAULT_TIMEOUT, sock_read=DEFAULT_TIMEOUT
+        )
         self._aiohttp_session = aiohttp.ClientSession(
             connector=conn, timeout=session_timeout, json_serialize=json_dumps
         )
