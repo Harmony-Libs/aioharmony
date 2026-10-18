@@ -15,7 +15,7 @@ from functools import partial
 from typing import TypeVar
 from uuid import uuid4
 
-from async_timeout import timeout
+from asyncio import timeout
 
 import aioharmony.exceptions as aioexc
 import aioharmony.handler as handlers

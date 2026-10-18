@@ -10,7 +10,7 @@ from uuid import uuid4
 
 import aiohttp
 from aiohttp.client_ws import ClientWSTimeout
-from async_timeout import timeout
+from asyncio import timeout
 
 from aioharmony.const import DEFAULT_WS_HUB_PORT as DEFAULT_HUB_PORT
 from aioharmony.const import ConnectorCallbackType
