@@ -245,6 +245,22 @@ async def test_change_channel_failed(
     assert "Change to channel 7 failed" in capsys.readouterr().out
 
 
+async def test_set_sleep_timer_ok(
+    mock_client: MagicMock, capsys: pytest.CaptureFixture[str]
+) -> None:
+    await cli.set_sleep_timer(mock_client, _make_args(interval=300))
+    mock_client.set_sleep_timer.assert_awaited_with(300)
+    assert "Sleep timer set to 300" in capsys.readouterr().out
+
+
+async def test_set_sleep_timer_failed(
+    mock_client: MagicMock, capsys: pytest.CaptureFixture[str]
+) -> None:
+    mock_client.set_sleep_timer = AsyncMock(return_value=False)
+    await cli.set_sleep_timer(mock_client, _make_args(interval=300))
+    assert "Sleep timer set to 300 failed" in capsys.readouterr().out
+
+
 async def test_sync_ok(
     mock_client: MagicMock, capsys: pytest.CaptureFixture[str]
 ) -> None:
