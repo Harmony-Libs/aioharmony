@@ -350,7 +350,7 @@ async def execute_per_hub(hub, args):
         await asyncio.sleep(args.wait)
     else:
         _LOGGER.debug("%s: Waiting till cancelled", hub)
-        await asyncio.Event.wait()
+        await asyncio.Event().wait()
 
     if hub_client:
         _LOGGER.debug("%s: Closing connection to HUB.", hub)
