@@ -290,3 +290,57 @@ async def test_close_stops_processing_messages(
     await queue.put({"type": "x"})
     await asyncio.sleep(0.05)
     assert seen == []
+
+
+def test_handler_match_string_value_against_container_message(
+    rh_pair: tuple[ResponseHandler, asyncio.Queue],
+) -> None:
+    """A scalar pattern value never matches a dict/list message."""
+    rh, _ = rh_pair
+    assert rh._handler_match(dict_list="literal", message={"a": 1}) is False  # noqa: SLF001
+    assert rh._handler_match(dict_list=re.compile("x"), message=["x"]) is False  # noqa: SLF001
+
+
+async def test_callback_handler_resets_queue_on_stray_cancel(
+    rh_pair: tuple[ResponseHandler, asyncio.Queue],
+) -> None:
+    """A CancelledError not from ``cancel()`` breaks the loop and resets the queue."""
+    rh, queue = rh_pair
+    original_queue = rh._message_queue  # noqa: SLF001
+
+    def raise_cancel(message: dict) -> None:
+        raise asyncio.CancelledError
+
+    rh._get_handlers = raise_cancel  # noqa: SLF001
+    await queue.put({"type": "x"})
+
+    task = rh._callback_task  # noqa: SLF001
+    assert await _wait_until(task.done)
+    assert task.cancelled() is False
+    assert task.exception() is None
+    assert rh._message_queue is not original_queue  # noqa: SLF001
+
+
+async def test_callback_handler_continues_after_unexpected_exception(
+    rh_pair: tuple[ResponseHandler, asyncio.Queue],
+) -> None:
+    """A non-cancel exception in the loop body is swallowed; dispatch continues."""
+    rh, queue = rh_pair
+    seen: list[dict] = []
+    rh.register_handler(handler=_make_handler(seen.append, resp_json={"type": "good"}))
+
+    original = rh._get_handlers  # noqa: SLF001
+    calls = {"n": 0}
+
+    def flaky(message: dict) -> list:
+        calls["n"] += 1
+        if calls["n"] == 1:
+            raise RuntimeError("boom")
+        return original(message=message)
+
+    rh._get_handlers = flaky  # noqa: SLF001
+    await queue.put({"type": "ignored"})
+    await queue.put({"type": "good"})
+
+    assert await _wait_until(lambda: seen)
+    assert seen == [{"type": "good"}]
