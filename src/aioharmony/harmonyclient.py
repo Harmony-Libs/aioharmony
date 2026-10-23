@@ -457,7 +457,16 @@ class HarmonyClient:
             )
             return None
 
-        self._hub_config = self._hub_config._replace(config=response.get("data"))
+        config = response.get("data")
+        if not isinstance(config, dict):
+            _LOGGER.error(
+                "%s: get_config response missing a data payload for %s",
+                self.name,
+                self._ip_address,
+            )
+            return None
+
+        self._hub_config = self._hub_config._replace(config=config)
 
         self._hub_config = self._hub_config._replace(
             activities=[
@@ -466,7 +475,7 @@ class HarmonyClient:
                     "name_lowercase": a["label"].lower(),
                     "id": int(a["id"]),
                 }
-                for a in self._hub_config.config.get("activity")
+                for a in config.get("activity") or []
             ]
         )
 
@@ -477,7 +486,7 @@ class HarmonyClient:
                     "name_lowercase": a["label"].lower(),
                     "id": int(a["id"]),
                 }
-                for a in self._hub_config.config.get("device")
+                for a in config.get("device") or []
             ]
         )
 
