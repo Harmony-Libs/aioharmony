@@ -7,9 +7,10 @@ this class allows one to query or send commands to the Hub.
 """
 
 import asyncio
+import contextlib
 import copy
 import logging
-from collections.abc import Awaitable, Callable, Sequence
+from collections.abc import Awaitable, Callable, Iterator, Sequence
 from datetime import timedelta
 from functools import partial
 from typing import TypeVar
@@ -132,6 +133,8 @@ class HarmonyClient:
 
         # Create the lock for getting HUB information.
         self._sync_lck = asyncio.Lock()
+        # Bumped on every successful config load.
+        self._config_load_count = 0
 
         # Create the activity start handler object when start activity is finished
         handler = copy.copy(handlers.HANDLER_START_ACTIVITY_FINISHED)
@@ -283,39 +286,40 @@ class HarmonyClient:
         # to receive the response and set our current config version
         # accordingly.
 
-        results = await asyncio.gather(
-            self.send_to_hub(command="get_current_state"),
-            self.refresh_info_from_hub(),
-            return_exceptions=True,
-        )
-        for idx, result in enumerate(results):
-            if isinstance(result, Exception):
-                if not isinstance(result, aioexc.TimeOut):
-                    raise result
+        with self._config_version_guard() as set_config_version:
+            results = await asyncio.gather(
+                self.send_to_hub(command="get_current_state"),
+                self.refresh_info_from_hub(),
+                return_exceptions=True,
+            )
+            for idx, result in enumerate(results):
+                if isinstance(result, Exception):
+                    if not isinstance(result, aioexc.TimeOut):
+                        raise result
+
+                    if idx == 0:
+                        _LOGGER.error("%s: Timeout trying to sync hub.", self.name)
+
+                    continue
 
                 if idx == 0:
-                    _LOGGER.error("%s: Timeout trying to sync hub.", self.name)
-
-                continue
-
-            if idx == 0:
-                resp_data = result.get("data")
-                if resp_data is not None:
-                    self._hub_config = self._hub_config._replace(
-                        config_version=resp_data.get("configVersion")
-                    )
-                    self._hub_config = self._hub_config._replace(hub_state=resp_data)
+                    resp_data = result.get("data")
+                    if resp_data is not None:
+                        set_config_version(resp_data.get("configVersion"))
+                        self._hub_config = self._hub_config._replace(
+                            hub_state=resp_data
+                        )
+                        _LOGGER.debug(
+                            "%s: HUB configuration version is: %s",
+                            self.name,
+                            self._hub_config.config_version,
+                        )
+                else:
                     _LOGGER.debug(
-                        "%s: HUB configuration version is: %s",
+                        "%s: HUB ID : %s",
                         self.name,
-                        self._hub_config.config_version,
+                        self._hub_config.info.get("activeRemoteId"),
                     )
-            else:
-                _LOGGER.debug(
-                    "%s: HUB ID : %s",
-                    self.name,
-                    self._hub_config.info.get("activeRemoteId"),
-                )
 
         if (
             self._hub_connection.callbacks.connect is None
@@ -378,7 +382,41 @@ class HarmonyClient:
         except asyncio.TimeoutError:
             raise aioexc.TimeOut
 
-    async def refresh_info_from_hub(self) -> None:
+    @contextlib.contextmanager
+    def _config_version_guard(self) -> Iterator[Callable[[int | None], None]]:
+        """Yield a config_version setter; roll it back if no config loads."""
+        previous_config_version = self._hub_config.config_version
+        config_load_count = self._config_load_count
+        set_version = previous_config_version
+
+        def set_config_version(config_version: int | None) -> None:
+            nonlocal set_version
+            set_version = config_version
+            self._hub_config = self._hub_config._replace(config_version=config_version)
+
+        try:
+            yield set_config_version
+        finally:
+            # Roll back so the next notification retries the refresh, unless a
+            # config was loaded meanwhile or a newer notification moved the
+            # version on.
+            if (
+                self._config_load_count == config_load_count
+                and self._hub_config.config_version == set_version
+                and set_version != previous_config_version
+            ):
+                _LOGGER.warning(
+                    "%s: HUB configuration for version %s not loaded,"
+                    " will retry on next notification",
+                    self.name,
+                    set_version,
+                )
+                self._hub_config = self._hub_config._replace(
+                    config_version=previous_config_version
+                )
+
+    async def refresh_info_from_hub(self) -> bool:
+        """Retrieve config and hub info; True if the config was loaded."""
         _LOGGER.debug("%s: Retrieving HUB information", self.name)
 
         async with self._sync_lck:
@@ -404,15 +442,20 @@ class HarmonyClient:
                     _LOGGER.error(
                         "%s: Timeout trying to retrieve %s.", self.name, result_name
                     )
-                    return
+                    break
                 if isinstance(result, Exception):
                     # Other exception, raise it.
                     raise result
+            else:
+                await self._get_current_activity()
 
-            await self._get_current_activity()
-
+        # _get_config stores the config itself, so it is loaded even if the
+        # hub info retrieval timed out.
+        config_loaded = results[0] is not None and not isinstance(results[0], Exception)
+        if config_loaded:
+            self._config_load_count += 1
         # If we were provided a callback handler then call it now.
-        if self._callbacks.config_updated:
+        if config_loaded and self._callbacks.config_updated:
             _LOGGER.debug("%s: Calling callback handler for config_updated", self.name)
             call_callback(
                 callback_handler=self._callbacks.config_updated,
@@ -420,6 +463,7 @@ class HarmonyClient:
                 callback_uuid=self._ip_address,
                 callback_name="config_updated_callback",
             )
+        return config_loaded
 
     async def _get_config(self) -> dict | None:
         """Retrieves the Harmony device configuration.
@@ -446,6 +490,11 @@ class HarmonyClient:
 
         if not response:
             # There was an issue
+            _LOGGER.error(
+                "%s: No response received trying to get configuration for %s",
+                self.name,
+                self._ip_address,
+            )
             return None
 
         if response.get("code") != 200:
@@ -728,11 +777,10 @@ class HarmonyClient:
                     self._hub_config.config_version,
                     current_hub_config_version,
                 )
-                self._hub_config = self._hub_config._replace(
-                    config_version=current_hub_config_version
-                )
-                # Get all the HUB information.
-                await self.refresh_info_from_hub()
+                with self._config_version_guard() as set_config_version:
+                    set_config_version(current_hub_config_version)
+                    # Get all the HUB information.
+                    await self.refresh_info_from_hub()
 
     # pylint: disable=broad-except
     async def _update_activity_callback(self, message: dict = None) -> None:

@@ -1094,15 +1094,78 @@ async def test_notification_callback_noop_when_version_unchanged(
     refresh.assert_not_awaited()
 
 
+def _refresh_mock(client: HarmonyClient, *results: bool) -> AsyncMock:
+    """Mock refresh_info_from_hub, bumping the config load count on success."""
+    results_iter = iter(results)
+
+    async def refresh() -> bool:
+        loaded = next(results_iter)
+        if loaded:
+            client._config_load_count += 1  # noqa: SLF001
+        return loaded
+
+    return AsyncMock(side_effect=refresh)
+
+
 async def test_notification_callback_refreshes_on_version_change(
     client: HarmonyClient,
 ) -> None:
     client._hub_config = client._hub_config._replace(config_version=7)  # noqa: SLF001
     message = {"data": {"configVersion": 8, "syncStatus": 2}}
-    with patch.object(client, "refresh_info_from_hub", AsyncMock()) as refresh:
+    with patch.object(
+        client, "refresh_info_from_hub", _refresh_mock(client, True)
+    ) as refresh:
         await client._notification_callback(message)  # noqa: SLF001
     refresh.assert_awaited_once()
     assert client.hub_config.config_version == 8
+
+
+async def test_notification_callback_retries_after_failed_refresh(
+    client: HarmonyClient,
+) -> None:
+    """A failed refresh restores the old version so the next notification retries."""
+    client._hub_config = client._hub_config._replace(config_version=7)  # noqa: SLF001
+    message = {"data": {"configVersion": 8, "syncStatus": 2}}
+    with patch.object(
+        client, "refresh_info_from_hub", _refresh_mock(client, False, True)
+    ) as refresh:
+        await client._notification_callback(message)  # noqa: SLF001
+        assert client.hub_config.config_version == 7
+        await client._notification_callback(message)  # noqa: SLF001
+    assert refresh.await_count == 2
+    assert client.hub_config.config_version == 8
+
+
+async def test_notification_callback_restores_version_when_refresh_raises(
+    client: HarmonyClient,
+) -> None:
+    client._hub_config = client._hub_config._replace(config_version=7)  # noqa: SLF001
+    message = {"data": {"configVersion": 8, "syncStatus": 2}}
+    with (
+        patch.object(
+            client, "refresh_info_from_hub", AsyncMock(side_effect=aioexc.TimeOut)
+        ),
+        pytest.raises(aioexc.TimeOut),
+    ):
+        await client._notification_callback(message)  # noqa: SLF001
+    assert client.hub_config.config_version == 7
+
+
+async def test_notification_callback_keeps_newer_version_on_failed_refresh(
+    client: HarmonyClient,
+) -> None:
+    """A failed refresh does not clobber a version set by a later notification."""
+    client._hub_config = client._hub_config._replace(config_version=7)  # noqa: SLF001
+
+    async def newer_notification_arrives() -> bool:
+        client._hub_config = client._hub_config._replace(config_version=9)  # noqa: SLF001
+        return False
+
+    with patch.object(client, "refresh_info_from_hub", newer_notification_arrives):
+        await client._notification_callback(  # noqa: SLF001
+            {"data": {"configVersion": 8, "syncStatus": 2}}
+        )
+    assert client.hub_config.config_version == 9
 
 
 # ---------------------------------------------------------------------------
@@ -1217,7 +1280,7 @@ async def test_refresh_info_from_hub_happy_path_fires_callback(
         patch.object(client, "_get_current_activity", AsyncMock(return_value=True)),
         patch("aioharmony.harmonyclient.call_callback") as mock_call,
     ):
-        await client.refresh_info_from_hub()
+        assert await client.refresh_info_from_hub() is True
 
     mock_call.assert_called_once()
     assert mock_call.call_args.kwargs["callback_handler"] is cb
@@ -1246,9 +1309,44 @@ async def test_refresh_info_from_hub_timeout_result_short_circuits(
         patch.object(client, "_retrieve_hub_info", AsyncMock(return_value={})),
         patch.object(client, "_get_current_activity", AsyncMock()) as gca,
     ):
-        await client.refresh_info_from_hub()
+        assert await client.refresh_info_from_hub() is False
 
     gca.assert_not_awaited()
+
+
+async def test_refresh_info_from_hub_returns_false_when_config_missing(
+    client: HarmonyClient,
+) -> None:
+    """A missing config returns False without firing config_updated."""
+    client._callbacks = client._callbacks._replace(config_updated=MagicMock())  # noqa: SLF001
+    with (
+        patch.object(client, "_get_config", AsyncMock(return_value=None)),
+        patch.object(client, "_retrieve_hub_info", AsyncMock(return_value={})),
+        patch.object(client, "_get_current_activity", AsyncMock(return_value=True)),
+        patch("aioharmony.harmonyclient.call_callback") as mock_call,
+    ):
+        assert await client.refresh_info_from_hub() is False
+
+    mock_call.assert_not_called()
+
+
+async def test_refresh_info_from_hub_hub_info_timeout_still_reports_config(
+    client: HarmonyClient,
+) -> None:
+    """A loaded config is reported even when hub info retrieval times out."""
+    client._callbacks = client._callbacks._replace(config_updated=MagicMock())  # noqa: SLF001
+    with (
+        patch.object(client, "_get_config", AsyncMock(return_value={"x": 1})),
+        patch.object(
+            client, "_retrieve_hub_info", AsyncMock(side_effect=aioexc.TimeOut)
+        ),
+        patch.object(client, "_get_current_activity", AsyncMock()) as gca,
+        patch("aioharmony.harmonyclient.call_callback") as mock_call,
+    ):
+        assert await client.refresh_info_from_hub() is True
+
+    gca.assert_not_awaited()
+    mock_call.assert_called_once()
 
 
 async def test_refresh_info_from_hub_other_exception_raises(
@@ -1310,7 +1408,7 @@ async def test_connect_populates_hub_state_and_fires_connect_callback(
     state_response = {"data": {"configVersion": 42, "extra": "x"}}
     with (
         patch.object(client, "send_to_hub", AsyncMock(return_value=state_response)),
-        patch.object(client, "refresh_info_from_hub", AsyncMock()),
+        patch.object(client, "refresh_info_from_hub", _refresh_mock(client, True)),
         patch("aioharmony.harmonyclient.call_callback") as mock_call,
     ):
         result = await client.connect()
@@ -1341,6 +1439,51 @@ async def test_connect_handles_get_current_state_timeout(
     assert result is True
     # config_version was NOT updated since the response never arrived.
     assert client.hub_config.config_version is None
+
+
+@pytest.mark.parametrize(
+    "refresh", [AsyncMock(return_value=False), AsyncMock(side_effect=aioexc.TimeOut)]
+)
+async def test_connect_clears_config_version_when_config_not_loaded(
+    client: HarmonyClient, refresh: AsyncMock
+) -> None:
+    """A failed initial config refresh leaves config_version unset."""
+    client._hub_connection = MagicMock()  # noqa: SLF001
+    client._hub_connection.hub_connect = AsyncMock(return_value=True)  # noqa: SLF001
+    client._hub_connection.callbacks = ConnectorCallbackType(None, None)  # noqa: SLF001
+
+    state_response = {"data": {"configVersion": 42}}
+    with (
+        patch.object(client, "send_to_hub", AsyncMock(return_value=state_response)),
+        patch.object(client, "refresh_info_from_hub", refresh),
+    ):
+        result = await client.connect()
+
+    assert result is True
+    assert client.hub_config.config_version is None
+    assert client.hub_config.hub_state == state_response["data"]
+
+
+async def test_connect_keeps_config_version_when_concurrent_refresh_loaded(
+    client: HarmonyClient,
+) -> None:
+    """A config loaded by a concurrent refresh keeps config_version set."""
+    client._hub_connection = MagicMock()  # noqa: SLF001
+    client._hub_connection.hub_connect = AsyncMock(return_value=True)  # noqa: SLF001
+    client._hub_connection.callbacks = ConnectorCallbackType(None, None)  # noqa: SLF001
+
+    async def concurrent_refresh_loads_config() -> bool:
+        client._config_load_count += 1  # noqa: SLF001
+        return False
+
+    state_response = {"data": {"configVersion": 42}}
+    with (
+        patch.object(client, "send_to_hub", AsyncMock(return_value=state_response)),
+        patch.object(client, "refresh_info_from_hub", concurrent_refresh_loads_config),
+    ):
+        assert await client.connect() is True
+
+    assert client.hub_config.config_version == 42
 
 
 async def test_connect_reraises_unexpected_exception_from_send(
