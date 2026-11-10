@@ -33,6 +33,7 @@ HUB_COMMANDS = {
         "command": "getCurrentActivity",
     },
     "send_command": {"mime": DEFAULT_HARMONY_MIME, "command": "holdAction"},
+    "set_sleep_timer": {"mime": DEFAULT_HARMONY_MIME, "command": "setsleeptimer"},
     "start_activity": {"mime": "harmony.activityengine", "command": "runactivity"},
     "sync": {"mime": "setup.sync", "command": None},
     "provision_info": {"mime": "setup.account", "command": "getProvisionInfo"},
