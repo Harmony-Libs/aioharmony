@@ -11,6 +11,7 @@ Hub.
 import asyncio
 import logging
 from datetime import datetime, timedelta
+from typing import Any
 
 from aioharmony.const import (
     PROTOCOL,
@@ -39,9 +40,9 @@ class HarmonyAPI:
     def __init__(
         self,
         ip_address: str,
-        protocol: PROTOCOL = None,
-        callbacks: ClientCallbackType = None,
-        loop: asyncio.AbstractEventLoop = None,
+        protocol: PROTOCOL | None = None,
+        callbacks: ClientCallbackType | None = None,
+        loop: asyncio.AbstractEventLoop | None = None,
     ) -> None:
         _LOGGER.debug("%s: Initialize", ip_address)
         loop = loop or asyncio.get_running_loop()
@@ -82,7 +83,7 @@ class HarmonyAPI:
         return self.hub_config.info.get("activeRemoteId")
 
     @property
-    def current_activity(self) -> tuple:
+    def current_activity(self) -> tuple[int | None, str | None]:
         return (
             self._harmony_client.current_activity_id,
             self._harmony_client.get_activity_name(
@@ -91,13 +92,13 @@ class HarmonyAPI:
         )
 
     @property
-    def config(self) -> dict:
+    def config(self) -> dict[str, Any]:
         return self.hub_config.config
 
     @property
-    def json_config(self) -> dict:
+    def json_config(self) -> dict[str, Any]:
         """Returns configuration as a dictionary (json)"""
-        result = {}
+        result: dict[str, Any] = {}
         config = self.config
         activity_dict = {}
 
@@ -131,16 +132,16 @@ class HarmonyAPI:
     def callbacks(self, value: ClientCallbackType) -> None:
         self._harmony_client.callbacks = value
 
-    def get_activity_id(self, activity_name) -> str | None:
+    def get_activity_id(self, activity_name: str) -> int | None:
         return self._harmony_client.get_activity_id(activity_name=activity_name)
 
-    def get_activity_name(self, activity_id) -> str | None:
+    def get_activity_name(self, activity_id: int) -> str | None:
         return self._harmony_client.get_activity_name(activity_id=activity_id)
 
-    def get_device_id(self, device_name) -> str | None:
+    def get_device_id(self, device_name: str) -> int | None:
         return self._harmony_client.get_device_id(device_name=device_name)
 
-    def get_device_name(self, device_id) -> str | None:
+    def get_device_name(self, device_id: int) -> str | None:
         return self._harmony_client.get_device_name(device_id=device_id)
 
     async def connect(self) -> bool:
@@ -152,8 +153,8 @@ class HarmonyAPI:
     def register_handler(
         self,
         handler: Handler,
-        msgid: str = None,
-        expiration: datetime | timedelta = None,
+        msgid: str | None = None,
+        expiration: datetime | timedelta | None = None,
     ) -> str:
         """Register a handler.
 
@@ -195,7 +196,7 @@ class HarmonyAPI:
         _LOGGER.debug("%s: Performing sync", self.name)
         # Send the command to the HUB
         response = await self._harmony_client.send_to_hub(command="sync")
-        if not response or response.get("code") != 200:
+        if not isinstance(response, dict) or response.get("code") != 200:
             # There was an issue
             return False
 
@@ -203,7 +204,7 @@ class HarmonyAPI:
         await self._harmony_client.refresh_info_from_hub()
         return True
 
-    async def start_activity(self, activity_id) -> tuple:
+    async def start_activity(self, activity_id: int | str) -> tuple[bool, str | None]:
         return await self._harmony_client.start_activity(activity_id=activity_id)
 
     async def send_commands(
@@ -243,7 +244,7 @@ class HarmonyAPI:
         response = await self._harmony_client.send_to_hub(
             command="change_channel", params=params
         )
-        if not response:
+        if not isinstance(response, dict):
             # There was an issue
             return False
 
