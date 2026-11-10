@@ -90,11 +90,6 @@ ip_address)` rather than f-strings). `flake8-logging-format`
   `orjson` directly. The shim prefers `orjson` when installed
   and falls back to stdlib `json` with `separators=(",", ":")`.
 
-- **`async-timeout` over `asyncio.timeout`.** The codebase uses
-  `async_timeout.timeout` consistently because the 3.10 floor
-  still includes a version where `asyncio.timeout` is brand-new;
-  follow suit rather than mixing the two.
-
 ## Commit / PR conventions
 
 - **Conventional Commits, lowercase subject.** The

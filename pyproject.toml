@@ -19,7 +19,6 @@ classifiers = [
     'License :: OSI Approved :: Apache Software License',
     'Programming Language :: Python',
     'Programming Language :: Python :: 3',
-    'Programming Language :: Python :: 3.10',
     'Programming Language :: Python :: 3.11',
     'Programming Language :: Python :: 3.12',
     'Programming Language :: Python :: 3.13',
@@ -34,7 +33,6 @@ urls.Changelog = "https://github.com/harmony-libs/aioharmony/blob/main/CHANGELOG
 urls.repository = "https://github.com/harmony-libs/aioharmony"
 dependencies = [
     "aiohttp>=3.11",
-    "async-timeout>=4",
     "slixmpp>=1.10",
 ]
 
